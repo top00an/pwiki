@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- pwiki 자동 수집: 30분마다 pwiki ingest 전체(all) (감싸개 install/pwiki_collect.py).
+	     잠금은 ingest 자신의 ~/.pwiki/ingest.lock, 실패하면 다음 회차가 다시 돈다.
+	     기록은 ~/.pwiki/logs/collect.log · collect.status.json · collect.last.txt.
+	     템플릿이다. install.sh 가 install/render_plist.py 로 자리표시를 사용자 경로로 바꿔
+	     ~/Library/LaunchAgents/local.pwiki.collect.plist 로 두고 launchctl bootstrap gui/<uid> 한다. -->
+	<key>Label</key>
+	<string>local.pwiki.collect</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>@@PYTHON@@</string>
+		<string>@@REPO@@/install/pwiki_collect.py</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>@@REPO@@</string>
+	<key>StartInterval</key>
+	<integer>1800</integer>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>ProcessType</key>
+	<string>Background</string>
+	<key>LowPriorityIO</key>
+	<true/>
+	<key>Nice</key>
+	<integer>10</integer>
+	<key>Umask</key>
+	<integer>63</integer>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>LANG</key>
+		<string>en_US.UTF-8</string>
+		<key>PYTHONIOENCODING</key>
+		<string>utf-8</string>
+		<key>PWIKI_HOME</key>
+		<string>@@PWIKI_HOME@@</string>
+		<key>PWIKI_CLAUDE_DIR</key>
+		<string>@@CLAUDE_DIR@@</string>
+		<key>PWIKI_VAULT</key>
+		<string>@@VAULT@@</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>@@PWIKI_HOME@@/logs/collect.launchd.log</string>
+	<key>StandardErrorPath</key>
+	<string>@@PWIKI_HOME@@/logs/collect.launchd.log</string>
+</dict>
+</plist>
