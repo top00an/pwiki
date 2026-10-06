@@ -31,6 +31,26 @@ LLM 을 부르지 않고, 네트워크를 쓰지 않고, 설치할 패키지도 
 
 ![pwiki 데모](docs/images/demo.gif)
 
+## Claude Code 안에서 쓰기
+
+설치하고 나면 명령을 외울 필요가 없습니다. Claude Code 세션에서 그냥 물어보면 됩니다.
+
+> 어제 뭐 했지?
+> 지난주에 돌린 mysql 명령 찾아줘
+> 이 프로젝트 어디까지 했더라?
+> 실수로 세션을 닫았는데, 어느 세션이었는지 찾아줘
+
+Claude 가 함께 설치되는 **스킬**로 알맞은 pwiki 명령을 골라 실행하고, 기록을 읽어 답합니다. 확실하게 부르고 싶으면 슬래시 명령을 씁니다.
+
+| 입력 | 하는 일 |
+|---|---|
+| `/pwiki` | 오늘 한 일 요약 |
+| `/pwiki 어제` 또는 `/pwiki 2026-10-02` | 그날 타임라인 |
+| `/pwiki <낱말>` | 모든 세션에서 검색. 예: `/pwiki mysql` |
+| `/pwiki resume` | 지금 프로젝트에서 어디까지 했는지 |
+
+스킬은 pwiki 의 조회 명령(`today`, `day`, `search`, `show`, `resume`, `redact-check`)과 색인을 새로 고치는 `ingest --all` 만 미리 허용해서, 이 명령들은 권한 확인 창 없이 돕니다. 그 밖의 명령은 여전히 확인을 묻습니다. Claude Code 의 `!` 를 붙여 직접 실행할 수도 있습니다. 예: `! pwiki today`
+
 ## 동작 구조
 
 ![pwiki 동작 구조](docs/images/architecture.ko.png)
@@ -65,7 +85,7 @@ LLM 을 부르지 않고, 네트워크를 쓰지 않고, 설치할 패키지도 
 git clone <저장소 주소> ~/src/pwiki && ~/src/pwiki/install.sh
 ```
 
-설치기는 선택 단계(자동 수집, 이어 하기 훅)마다 묻습니다. 그다음:
+설치기는 선택 단계(자동 수집, 이어 하기 훅, Claude Code 스킬)마다 묻습니다. 그다음 터미널에서:
 
 ```sh
 alias pwiki='/usr/bin/python3 ~/src/pwiki/pwiki'
@@ -83,6 +103,7 @@ pwiki today
 | `~/pwiki/` | Obsidian 용 마크다운 페이지 | `pwiki export` |
 | `~/Library/LaunchAgents/local.pwiki.collect.plist` | 30분마다 수집(macOS) | 설치 선택 단계 |
 | `~/.claude/settings.json` | SessionStart 훅 그룹 하나 덧붙임. `./uninstall.sh` 가 뺌 | 설치 선택 단계 |
+| `~/.claude/skills/pwiki/SKILL.md` | `/pwiki` 스킬. `./uninstall.sh` 가 지움(pwiki 가 쓰지 않은 파일은 덮지 않음) | 설치 선택 단계 |
 
 pwiki 는 `CLAUDE.md` 를 쓰지 않고, 작업 폴더를 건드리지 않고, 네트워크에 연결하지 않습니다.
 
@@ -153,10 +174,11 @@ pwiki 는 `CLAUDE.md` 를 쓰지 않고, 작업 폴더를 건드리지 않고, �
 | 4 | vault 내보내기 `pwiki export` |
 | 5 | (선택) 자동 수집. 맥은 launchd 잡 `local.pwiki.collect` 를 30분마다 돌린다. 리눅스는 crontab 한 줄을 안내만 한다 |
 | 6 | (선택) 이어 하기 훅. `~/.claude/settings.json` 의 `hooks.SessionStart` 끝에 그룹 하나를 덧붙인다 |
+| 7 | (선택) Claude Code 스킬. `~/.claude/skills/pwiki/SKILL.md` 를 둬서 세션 안에서 `/pwiki` 나 말로 쓰게 한다 |
 
-다시 돌려도 안전합니다. 수집은 이어 읽고, plist 는 같으면 그대로 두고, 훅은 이미 있으면 다시 넣지 않습니다.
+다시 돌려도 안전합니다. 수집은 이어 읽고, plist 는 같으면 그대로 두고, 훅은 이미 있으면 다시 넣지 않고, 스킬 파일은 같으면 그대로 둡니다.
 
-옵션: `--collector`·`--no-collector`, `--hook`·`--no-hook`, `--yes`, `--dry-run`, `--python PATH`, `--settings PATH`.
+옵션: `--collector`·`--no-collector`, `--hook`·`--no-hook`, `--skill`·`--no-skill`, `--yes`, `--dry-run`, `--python PATH`, `--settings PATH`.
 위치는 환경변수 `PWIKI_HOME`(기본 `~/.pwiki`), `PWIKI_VAULT`(기본 `~/pwiki`), `PWIKI_CLAUDE_DIR`(기본 `~/.claude`)로 바꿉니다.
 
 <details>
@@ -227,7 +249,7 @@ pwiki redact-check                 # 남은 개수 확인(0 이어야 한다)
 ## 제거
 
 ```sh
-./uninstall.sh                     # 훅 빼기 + 자동 수집 내리기. 데이터는 남긴다
+./uninstall.sh                     # 훅·자동 수집·스킬 빼기. 데이터는 남긴다
 ./uninstall.sh --purge-data        # pwiki 가 만든 데이터까지 지운다(되돌릴 수 없다, 확인을 묻는다)
 ./uninstall.sh --purge-data --yes  # 묻지 않고 지운다
 ./uninstall.sh --dry-run
@@ -278,7 +300,7 @@ pwikilib/
   export.py             Obsidian vault 내보내기
   check.py, leakscan.py verify·redact-check, 독립 유출 검사
   db.py, rederive.py    스키마, 규칙 다시 적용
-install/                설치 도우미, 수집기, 이어 하기 훅
+install/                설치 도우미, 수집기, 이어 하기 훅, Claude Code 스킬
 tools/                  합성 기록 생성기, 배포본 생성기, 배포본 누출 검사
 tests/                  합성 기록으로만 도는 시험
 docs/                   가림 안내, README 그림

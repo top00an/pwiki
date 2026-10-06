@@ -2,12 +2,13 @@
 # pwiki 설치기. 저장소를 푼 자리에서 그대로 돈다(파일을 다른 곳으로 복사하지 않는다).
 #
 # 단계: 요건 검사 → PWIKI_HOME 만들기(700) → 첫 수집(ingest --all) → vault 내보내기(export)
-#       → (선택) 자동 수집 → (선택) 이어 하기 훅
+#       → (선택) 자동 수집 → (선택) 이어 하기 훅 → (선택) Claude Code 스킬(/pwiki, 말로 부르기)
 # 다시 돌려도 안전하다: 수집은 이어 읽기, plist 는 같으면 두고, 훅은 이미 있으면 두지 않는다.
 #
 # 옵션:
 #   --collector / --no-collector   자동 수집(맥: launchd 30분, 리눅스: crontab 안내만)
 #   --hook / --no-hook             Claude Code SessionStart 이어 하기 훅(settings.json 에 덧붙이기)
+#   --skill / --no-skill           Claude Code 스킬(settings.json 옆 skills/pwiki/SKILL.md). 세션 안에서 /pwiki 나 말로 부른다
 #   --yes, -y                      정하지 않은 선택 단계를 모두 '예'로
 #   --dry-run                      바꾸는 명령만 출력하고 바꾸지 않는다
 #   --python PATH                  쓸 python3(기본: 맥은 /usr/bin/python3 먼저, 그다음 PATH)
@@ -20,7 +21,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 LABEL="local.pwiki.collect"
 
-DRY=0; YES=0; COLLECTOR=""; HOOK=""; PY_OPT=""; SETTINGS_OPT=""
+DRY=0; YES=0; COLLECTOR=""; HOOK=""; SKILL=""; PY_OPT=""; SETTINGS_OPT=""
 
 # 도움말: 맨 위 주석 덩어리만(첫 코드 줄 앞에서 멈춘다)
 usage() { awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"; }
@@ -33,6 +34,8 @@ while [ $# -gt 0 ]; do
     --no-collector) COLLECTOR=0 ;;
     --hook) HOOK=1 ;;
     --no-hook) HOOK=0 ;;
+    --skill) SKILL=1 ;;
+    --no-skill) SKILL=0 ;;
     --python) [ $# -ge 2 ] || { echo "--python 에 경로가 없다" >&2; exit 2; }; PY_OPT="$2"; shift ;;
     --settings) [ $# -ge 2 ] || { echo "--settings 에 경로가 없다" >&2; exit 2; }; SETTINGS_OPT="$2"; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -269,6 +272,8 @@ COLLECTOR_ON=0
 HOOK_ON=0
 HOOK_CMD=""
 PLIST=""
+SKILL_ON=0
+SKILL_DIR="$(dirname "$SETTINGS")/skills/pwiki"
 
 step "5. 자동 수집(30분마다 ingest --all)"
 if ask "$COLLECTOR" "자동 수집을 켤까요?"; then
@@ -328,12 +333,30 @@ else
   say "이어 하기 훅: 건너뜀"
 fi
 
+step "7. Claude Code 스킬(/pwiki, 말로 부르기)"
+if ask "$SKILL" "Claude Code 세션 안에서 pwiki 를 쓰게 스킬을 둘까요?"; then
+  SKILL_ARGS=("$PY" "$REPO/install/skill.py" install --dir "$SKILL_DIR" --repo "$REPO" --python "$PY")
+  [ "$DRY" = 1 ] && SKILL_ARGS+=(--dry-run)
+  set +e
+  "${SKILL_ARGS[@]}" | sed 's/^/  | /'
+  rc=${PIPESTATUS[0]}
+  set -e
+  if [ "$rc" = 0 ]; then
+    SKILL_ON=1
+    say "세션 안에서: /pwiki, /pwiki 어제, /pwiki 검색어 · 또는 '어제 뭐 했지?'처럼 말로"
+  else
+    say "스킬: 건너뜀(위 이유). 나머지 설치는 그대로다"
+  fi
+else
+  say "스킬: 건너뜀"
+fi
+
 # ---- 설치 기록(제거기가 읽는다) -----------------------------------------------------------
 STATE="$PWIKI_HOME/install.json"
 if [ "$DRY" = 0 ]; then
-  ( umask 077; "$PY" - "$STATE" "$REPO" "$PY" "$COLLECTOR_ON" "$PLIST" "$HOOK_ON" "$HOOK_CMD" "$SETTINGS" "$PWIKI_VAULT" <<'EOP'
+  ( umask 077; "$PY" - "$STATE" "$REPO" "$PY" "$COLLECTOR_ON" "$PLIST" "$HOOK_ON" "$HOOK_CMD" "$SETTINGS" "$PWIKI_VAULT" "$SKILL_ON" "$SKILL_DIR" <<'EOP'
 import json, os, sys
-path, repo, py, col, plist, hook, cmd, settings, vault = sys.argv[1:]
+path, repo, py, col, plist, hook, cmd, settings, vault, skill, skill_dir = sys.argv[1:]
 old = {}
 try:
     with open(path, encoding="utf-8") as fh:
@@ -343,7 +366,9 @@ except (OSError, ValueError):
 st = {"repo": repo, "python": py, "vault": vault,
       "collector": bool(int(col)) or bool(old.get("collector")), "plist": plist or old.get("plist") or "",
       "hook": bool(int(hook)) or bool(old.get("hook")), "hook_command": cmd or old.get("hook_command") or "",
-      "settings": settings if int(hook) else (old.get("settings") or settings)}
+      "settings": settings if int(hook) else (old.get("settings") or settings),
+      "skill": bool(int(skill)) or bool(old.get("skill")),
+      "skill_dir": skill_dir if int(skill) else (old.get("skill_dir") or "")}
 tmp = path + ".tmp"
 with open(tmp, "w", encoding="utf-8") as fh:
     json.dump(st, fh, ensure_ascii=False, indent=1)

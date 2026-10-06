@@ -1,5 +1,5 @@
 #!/bin/bash
-# pwiki 제거기. 이어 하기 훅과 자동 수집을 뺀다. 데이터(PWIKI_HOME, vault)는 기본으로 남긴다.
+# pwiki 제거기. 이어 하기 훅과 자동 수집, Claude Code 스킬을 뺀다. 데이터(PWIKI_HOME, vault)는 기본으로 남긴다.
 #
 # 옵션:
 #   --purge-data     pwiki 가 만든 데이터까지 지운다. 되돌릴 수 없다(아무것도 바꾸기 전에 확인을 묻는다).
@@ -144,6 +144,14 @@ if [ -f "$SETTINGS" ]; then
 else
   say "settings.json 없음: $SETTINGS (건너뜀)"
 fi
+
+# ---- 1b. 스킬 ----------------------------------------------------------------------
+step "1b. Claude Code 스킬 빼기"
+SKILL_DIR="$(state skill_dir)"
+SKILL_DIR="${SKILL_DIR:-$(dirname "$SETTINGS")/skills/pwiki}"
+SKILL_ARGS=("$PY" "$REPO/install/skill.py" remove --dir "$SKILL_DIR" --repo "$REPO")
+[ "$DRY" = 1 ] && SKILL_ARGS+=(--dry-run)
+"${SKILL_ARGS[@]}" | sed 's/^/  | /' || true
 
 # ---- 2. 자동 수집 -------------------------------------------------------------------
 step "2. 자동 수집 빼기"

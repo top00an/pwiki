@@ -1,0 +1,44 @@
+---
+name: pwiki
+description: Look up the user's own past Claude Code work from pwiki's local history index. Use when the user asks what they did today, yesterday or on a date, wants to find a command, file, error or conversation from an earlier session, asks where they left off or wants to recover context after /clear or a closed session, wants to reopen an old session, or asks whether secrets were masked. Also runs as /pwiki [today | date | search words | resume].
+argument-hint: "[today | YYYY-MM-DD | search words | resume]"
+allowed-tools: Bash(@CMD@ today), Bash(@CMD@ day *), Bash(@CMD@ search *), Bash(@CMD@ show *), Bash(@CMD@ resume *), Bash(@CMD@ redact-check), Bash(@CMD@ ingest --all)
+---
+@MARK@
+
+# pwiki: the user's local Claude Code history
+
+pwiki keeps a local SQLite index of the user's past Claude Code sessions, with secrets already masked.
+Run it with this exact command prefix (only the commands listed below are pre-approved):
+
+```
+@CMD@ <command> [options]
+```
+
+Output is Korean Markdown. Read it, pick out what answers the question, and reply in the user's language. Quote the relevant lines instead of pasting whole outputs.
+
+## When invoked as `/pwiki` with arguments: `$ARGUMENTS`
+
+- No arguments: run `today` and summarize the day by project.
+- `today`, a date `YYYY-MM-DD`, `yesterday` or `어제`: run `today` or `day <YYYY-MM-DD>`.
+- `resume`: run `resume --project <absolute path of the current working directory>`.
+- Anything else: treat it as search words and run `search "<words>"`.
+
+## Choosing a command from a plain request
+
+| The user wants | Run |
+|---|---|
+| What they did today | `today` |
+| What they did on a given day | `day YYYY-MM-DD` (dates follow `PWIKI_TZ`, KST by default) |
+| To find something done before (a command, file, error, decision) | `search "<2-4 distinctive words>"`, then `show <key>` for the full text of a hit |
+| Search including subagent and workflow logs | add `--all`; narrow with `--project <name>` or `--since YYYY-MM-DD` |
+| Where they left off, or context after `/clear` | `resume --project <absolute path of the current working directory>` |
+| To reopen an old session | find its session id with `today`, `day` or `search`, then tell the user to run `claude --resume <session-id>` themselves (you cannot reopen a session for them) |
+| To check that secrets are masked | `redact-check` (the verdict line should say `통과(0건)`) |
+
+## Rules
+
+- The index is refreshed by a background collector every 30 minutes. If the question is about the last half hour, run `ingest --all` first (it can take up to a minute on a large history).
+- Keys printed by `search`, `day` and `resume` look like `<session-id>:<uuid>`; pass them to `show` unchanged.
+- Never guess or reconstruct values shown as `[REDACTED:...]`.
+- pwiki is read-only toward `~/.claude`. Do not run `rederive --apply`, `export` or the installer unless the user asks.

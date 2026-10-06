@@ -31,6 +31,26 @@ No LLM calls, no network, no `pip install`: just the Python standard library. Th
 
 ![pwiki demo](docs/images/demo.gif)
 
+## Use it inside Claude Code
+
+After install, you don't need to remember any command. Inside a Claude Code session, just ask:
+
+> What did I do yesterday?
+> Find the mysql command I ran last week.
+> Where did I leave off in this project?
+> I closed the session by mistake. Which one was it, so I can reopen it?
+
+Claude picks the right pwiki command through the bundled **skill** and answers from your history. To be explicit, use the slash command:
+
+| Type | What runs |
+|---|---|
+| `/pwiki` | today's work, summarized |
+| `/pwiki yesterday` or `/pwiki 2026-10-02` | that day's timeline |
+| `/pwiki <words>` | search all sessions, for example `/pwiki mysql` |
+| `/pwiki resume` | where you left off in the current project |
+
+The skill pre-approves only pwiki's lookup commands (`today`, `day`, `search`, `show`, `resume`, `redact-check`) and `ingest --all` to refresh the index, so those run without permission prompts. Anything else still asks. You can also run any command directly with Claude Code's `!` prefix, for example `! pwiki today`.
+
 ## How it works
 
 ![How pwiki works](docs/images/architecture.png)
@@ -65,7 +85,7 @@ On macOS a launchd job runs ingest every 30 minutes, and the resume hook runs wh
 git clone <repo-url> ~/src/pwiki && ~/src/pwiki/install.sh
 ```
 
-The installer asks before each optional step (auto-collect, resume hook). Then:
+The installer asks before each optional step (auto-collect, resume hook, Claude Code skill). Then, in a terminal:
 
 ```sh
 alias pwiki='/usr/bin/python3 ~/src/pwiki/pwiki'
@@ -83,6 +103,7 @@ Keep the checkout out of `~/pwiki`: that is the default vault location.
 | `~/pwiki/` | Markdown pages for Obsidian | `pwiki export` |
 | `~/Library/LaunchAgents/local.pwiki.collect.plist` | 30-minute collector (macOS) | optional install step |
 | `~/.claude/settings.json` | One SessionStart hook group appended; `./uninstall.sh` removes it | optional install step |
+| `~/.claude/skills/pwiki/SKILL.md` | The `/pwiki` skill; `./uninstall.sh` removes it (never overwrites a file it did not write) | optional install step |
 
 pwiki never writes `CLAUDE.md`, never touches your project folders, and never opens a network connection.
 
@@ -153,10 +174,11 @@ Unpack the repository anywhere and run it in place. The installer does not copy 
 | 4 | Export the vault, `pwiki export` |
 | 5 | (optional) Auto-collect. macOS runs the launchd job `local.pwiki.collect` every 30 minutes; on Linux the installer prints a crontab line for you |
 | 6 | (optional) Resume hook. Appends one group to `hooks.SessionStart` in `~/.claude/settings.json` |
+| 7 | (optional) Claude Code skill. Writes `~/.claude/skills/pwiki/SKILL.md` so you can use `/pwiki` or plain questions inside a session |
 
-Running it again is safe: ingest resumes where it stopped, an identical plist is left alone, and the hook is not added twice.
+Running it again is safe: ingest resumes where it stopped, an identical plist is left alone, the hook is not added twice, and an identical skill file is left alone.
 
-Options: `--collector`/`--no-collector`, `--hook`/`--no-hook`, `--yes`, `--dry-run`, `--python PATH`, `--settings PATH`.
+Options: `--collector`/`--no-collector`, `--hook`/`--no-hook`, `--skill`/`--no-skill`, `--yes`, `--dry-run`, `--python PATH`, `--settings PATH`.
 Locations come from `PWIKI_HOME` (default `~/.pwiki`), `PWIKI_VAULT` (default `~/pwiki`) and `PWIKI_CLAUDE_DIR` (default `~/.claude`).
 
 <details>
@@ -227,7 +249,7 @@ The full list of rules, what they can miss, and how to read `redact-check` is in
 ## Uninstall
 
 ```sh
-./uninstall.sh                     # remove the hook and the collector, keep data
+./uninstall.sh                     # remove the hook, collector and skill, keep data
 ./uninstall.sh --purge-data        # also delete data pwiki created (irreversible, asks first)
 ./uninstall.sh --purge-data --yes  # delete without asking
 ./uninstall.sh --dry-run
@@ -278,7 +300,7 @@ pwikilib/
   export.py             Obsidian vault export
   check.py, leakscan.py verify, redact-check, independent leak scan
   db.py, rederive.py    schema, re-applying rules
-install/                installer helpers, collector, resume hook
+install/                installer helpers, collector, resume hook, Claude Code skill
 tools/                  synthetic history generator, dist builder, dist leak check
 tests/                  tests that run on synthetic history only
 docs/                   redaction guide, README images

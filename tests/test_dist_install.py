@@ -331,6 +331,63 @@ class HookInstallTest(DistBase):
         self.assertEqual(json.loads(rd(settings)), {})
 
 
+class SkillInstallTest(DistBase):
+    """Claude Code 스킬: 이 저장소가 쓴 것만 쓰고 지운다. 사람 파일·다른 설치의 스킬은 건드리지 않는다."""
+
+    @property
+    def skill(self):
+        return os.path.join(self.home, ".claude", "skills", "pwiki", "SKILL.md")
+
+    def test_install_rerun_uninstall(self):
+        self.fixture()
+        rc, out = self.install("--skill", "--no-hook", "--no-collector", "--yes")
+        self.assertEqual(rc, 0, out)
+        body = rd(self.skill)
+        self.assertTrue(body.startswith("---\nname: pwiki\n"))
+        self.assertIn("pwiki-skill repo=%s written by" % json.dumps(os.path.realpath(ROOT)), body)
+        self.assertIn(os.path.join(os.path.realpath(ROOT), "pwiki"), body)
+        self.assertNotIn("@CMD@", body)
+        self.assertNotIn("@MARK@", body)
+        self.assertNotIn("%s *)" % os.path.join(os.path.realpath(ROOT), "pwiki"), body)  # 하위 명령별로만 허용
+        self.assertIn("$ARGUMENTS", body)
+        self.assertEqual(os.stat(self.skill).st_mode & 0o777, 0o644)
+        st = json.loads(rd(os.path.join(self.pwiki_home, "install.json")))
+        self.assertTrue(st["skill"])
+        rc, out = self.install("--skill", "--no-hook", "--no-collector", "--yes")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("스킬 같음", out)
+        rc, out = self.uninstall("--yes")
+        self.assertEqual(rc, 0, out)
+        self.assertFalse(os.path.exists(self.skill))
+        self.assertFalse(os.path.exists(os.path.dirname(self.skill)))
+        self.assertTrue(os.path.isdir(os.path.join(self.home, ".claude", "skills")))
+
+    def test_human_skill_is_never_touched(self):
+        self.fixture()
+        os.makedirs(os.path.dirname(self.skill))
+        with open(self.skill, "w", encoding="utf-8") as fh:
+            fh.write("---\nname: pwiki\n---\nmy own notes\n")
+        before = rd(self.skill, True)
+        rc, out = self.install("--skill", "--no-hook", "--no-collector", "--yes")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("pwiki 가 만든 파일이 아니다", out)
+        self.assertEqual(rd(self.skill, True), before)
+        self.assertFalse(json.loads(rd(os.path.join(self.pwiki_home, "install.json")))["skill"])
+        rc, out = self.uninstall("--yes")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(rd(self.skill, True), before)
+
+    def test_no_skill_and_dry_run_write_nothing(self):
+        self.fixture()
+        rc, out = self.install("--no-skill", "--no-hook", "--no-collector", "--yes")
+        self.assertEqual(rc, 0, out)
+        self.assertFalse(os.path.exists(self.skill))
+        rc, out = self.install("--skill", "--no-hook", "--no-collector", "--yes", "--dry-run")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("(쓰기)", out)
+        self.assertFalse(os.path.exists(self.skill))
+
+
 class CollectorDryRunTest(DistBase):
     def test_collector_dry_run_prints_and_writes_nothing(self):
         self.fixture()
