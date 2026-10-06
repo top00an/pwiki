@@ -10,6 +10,27 @@ def claude_dir():
     return os.environ.get("PWIKI_CLAUDE_DIR") or os.path.join(HOME_USER, ".claude")
 
 
+def codex_dir():
+    """OpenAI Codex CLI 기록 폴더. 여기서는 sessions/**/rollout-*.jsonl 과 history.jsonl 만 연다(ingest.discover_codex)."""
+    return os.environ.get("PWIKI_CODEX_DIR") or os.path.join(HOME_USER, ".codex")
+
+
+# 원천 상대경로(files.path·docs.path). Claude Code 원천은 ~/.claude 기준 그대로, Codex 원천은 앞에 "codex/" 를 붙인다.
+CODEX_PREFIX = "codex/"
+
+
+def source_of(rel):
+    """상대경로의 원천: 'codex' 또는 'claude'."""
+    return "codex" if (rel or "").startswith(CODEX_PREFIX) else "claude"
+
+
+def source_path(rel, claude=None):
+    """상대경로 → 절대경로. claude 를 주면 Claude Code 원천의 기준 폴더로 쓴다."""
+    if source_of(rel) == "codex":
+        return os.path.join(codex_dir(), rel[len(CODEX_PREFIX):])
+    return os.path.join(claude or claude_dir(), rel)
+
+
 def pwiki_home():
     return os.environ.get("PWIKI_HOME") or os.path.join(HOME_USER, ".pwiki")
 

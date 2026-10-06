@@ -281,6 +281,15 @@ def cmd_export(a):
     return 0 if not r["n_conflicts"] and not r["blocked"] else 4
 
 
+def cmd_update(a):
+    from . import update
+    try:
+        return update.run(check_only=a.check, out=_p)
+    except update.UpdateError as e:
+        _p("멈춤: %s" % e)
+        return 1
+
+
 def build_parser():
     ap = argparse.ArgumentParser(prog="pwiki", description="Claude Code 기록 결정론 wiki (1단계, LLM 없음)")
     ap.add_argument("--version", action="version", version="pwiki " + VERSION)
@@ -327,6 +336,9 @@ def build_parser():
     p = sp.add_parser("export", help="Obsidian vault 로 md 내보내기")
     p.add_argument("--vault", help="기본 ~/pwiki")
     p.set_defaults(fn=cmd_export)
+    p = sp.add_parser("update", help="GitHub 의 새 판 받기(git pull --ff-only) 뒤 설치 때 고른 선택 그대로 install.sh 다시 반영")
+    p.add_argument("--check", action="store_true", help="새 판이 있는지만 보고 아무것도 바꾸지 않는다")
+    p.set_defaults(fn=cmd_update)
     return ap
 
 

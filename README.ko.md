@@ -10,7 +10,7 @@
 ![Dependencies](https://img.shields.io/badge/dependencies-standard%20library%20only-2f6fde)
 ![LLM](https://img.shields.io/badge/LLM-none-0f7b5f)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-555)
-![Version](https://img.shields.io/badge/version-0.1.0-555)
+![Version](https://img.shields.io/badge/version-0.2.0-555)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 
 [English](README.md) · **한국어**
@@ -99,13 +99,14 @@ pwiki today
 | 경로 | 하는 일 | 언제 |
 |---|---|---|
 | `~/.claude/projects`, `history.jsonl`, 메모리 파일 | **읽기만.** 고치거나 지우지 않음 | 수집할 때마다 |
+| `~/.codex/sessions/**/rollout-*.jsonl`, `~/.codex/history.jsonl` | **읽기만.** `~/.codex` 의 다른 파일(`auth.json`, `config.toml` 등)은 열지 않음 | Codex CLI 가 있으면 수집할 때마다 |
 | `~/.pwiki/` (권한 700) | DB, 로그, 내가 적은 비밀값 목록 | 설치, 수집할 때마다 |
 | `~/pwiki/` | Obsidian 용 마크다운 페이지 | `pwiki export` |
 | `~/Library/LaunchAgents/local.pwiki.collect.plist` | 30분마다 수집(macOS) | 설치 선택 단계 |
 | `~/.claude/settings.json` | SessionStart 훅 그룹 하나 덧붙임. `./uninstall.sh` 가 뺌 | 설치 선택 단계 |
 | `~/.claude/skills/pwiki/SKILL.md` | `/pwiki` 스킬. `./uninstall.sh` 가 지움(pwiki 가 쓰지 않은 파일은 덮지 않음) | 설치 선택 단계 |
 
-pwiki 는 `CLAUDE.md` 를 쓰지 않고, 작업 폴더를 건드리지 않고, 네트워크에 연결하지 않습니다.
+pwiki 는 `CLAUDE.md` 를 쓰지 않고, 작업 폴더를 건드리지 않고, 네트워크에 연결하지 않습니다. 예외는 `pwiki update` 하나입니다. 이 명령은 처음 clone 한 저장소에 `git fetch` 를 실행합니다.
 
 ## 요구 사항
 
@@ -164,6 +165,7 @@ python3 -c "import sys, sqlite3; print(sys.version.split()[0], sqlite3.sqlite_ve
 | `pwiki redact-check` | DB·WAL·검색 색인·vault·로그에 남은 비밀값 개수(값은 출력하지 않습니다) |
 | `pwiki rederive [--apply]` | 저장된 행에 지금 규칙(가림·분류·카드)을 다시 적용 |
 | `pwiki eff` | 효율 지표(숫자만) |
+| `pwiki update [--check]` | 새 판을 받고 설치 때 고른 선택을 다시 반영합니다. `--check` 는 확인만 합니다 |
 
 자동 수집은 DB 만 갱신합니다. vault 는 `pwiki export` 를 돌릴 때 갱신됩니다.
 
@@ -267,6 +269,27 @@ pwiki redact-check                 # 남은 개수 확인(0 이어야 한다)
 
 규칙 전체 목록, 놓칠 수 있는 것, `redact-check` 읽는 법은 [docs/REDACTION.ko.md](docs/REDACTION.ko.md) 에 있습니다.
 
+## Codex CLI
+
+OpenAI Codex CLI 도 쓰고 있다면 pwiki 가 그 세션도 자동으로 수집합니다. 따로 켤 것은 없습니다.
+Codex 세션은 `today`, `day`, `search`, `resume` 에 Claude Code 세션과 함께 나오고(`today`, `day`, `resume` 에는 `Codex` 표시가 붙습니다), 같은 작업 폴더에서 쓴 세션은 한 프로젝트로 묶입니다.
+
+- `~/.codex/sessions/**/rollout-*.jsonl` 과 `~/.codex/history.jsonl` 만 읽습니다. Codex 기록 폴더가 다른 곳에 있으면 `PWIKI_CODEX_DIR` 로 지정합니다.
+- 비밀값은 Claude Code 기록과 똑같이 가리고, `pwiki verify` 와 `pwiki redact-check` 도 Codex 파일까지 검사합니다.
+- 이어 하기 훅은 아직 Claude Code 에서만 동작합니다.
+
+## 업데이트
+
+```sh
+pwiki update --check   # 새 판이 있는지만 확인합니다(아무것도 바꾸지 않음)
+pwiki update           # 새 판을 받고, 설치 때 고른 선택으로 install.sh 를 다시 돌리고, 바뀐 내용을 보여 줍니다
+```
+
+- `pwiki update` 는 `~/.pwiki/install.json` 에 기록된 선택(자동 수집, 이어 하기 훅, 스킬)을 그대로 install.sh 에 넘깁니다. 꺼 둔 기능을 다시 켜지 않습니다. 다만 한 번 설치한 기능은 기록에 켜진 것으로 남으므로, 기능 하나를 완전히 빼려면 `./uninstall.sh` 뒤에 원하는 선택으로 `./install.sh` 를 다시 돌립니다.
+- 설치 폴더의 파일을 직접 고쳐 두었다면 덮어쓰지 않고, 어떤 파일인지 알려 준 뒤 멈춥니다.
+- `pwiki update` 가 없는 옛 설치나 clone 이 아닌 내려받기 설치는 `git pull --ff-only && ./install.sh` 로 갱신합니다.
+- 새 판 소식을 받으려면 GitHub 저장소에서 **Watch → Custom → Releases** 를 켜 둡니다. 바뀐 내용은 [CHANGELOG.md](CHANGELOG.md) 에 있습니다.
+
 ## 제거
 
 ```sh
@@ -302,7 +325,7 @@ Claude Code 원래 기록(`~/.claude`)은 어떤 경우에도 지우지 않습�
 
 ## 로드맵
 
-- **Codex CLI 지원**: `~/.codex/sessions` 기록을 같은 DB·타임라인·검색에 넣습니다. 다음 작업입니다.
+- **Codex CLI 이어 하기 훅**: Codex 세션 수집과 검색은 0.2.0 부터 됩니다. Codex 세션을 시작할 때 맥락을 붙이는 기능이 다음 작업입니다.
 - **영어 출력 옵션**: 지금 출력 문구는 한국어입니다.
 - **다른 에이전트 CLI**(OpenCode, Copilot CLI): 수요가 있으면 검토합니다.
 
@@ -316,11 +339,13 @@ pwikilib/
   ingest.py             수집(DB 에 쓰는 유일한 곳)
   parse.py              한 줄 분류·정제·추출
   redact.py             비밀값 가림
+  codex.py              Codex CLI 줄을 Claude Code 줄 모양으로 옮김
   cards.py              작업 카드
   views.py              today·day·resume·search·eff (읽기 전용)
   export.py             Obsidian vault 내보내기
   check.py, leakscan.py verify·redact-check, 독립 유출 검사
   db.py, rederive.py    스키마, 규칙 다시 적용
+  update.py             pwiki update
 install/                설치 도우미, 수집기, 이어 하기 훅, Claude Code 스킬
 tools/                  합성 기록 생성기, 배포본 생성기, 배포본 누출 검사
 tests/                  합성 기록으로만 도는 시험

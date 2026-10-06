@@ -10,7 +10,10 @@ import sqlite3
 
 from . import paths
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+# 판 2: files.src·sessions.src('claude'|'codex'). 판 1 DB 는 init 이 ALTER 로 열을 더한다(멱등).
+SRC_COLUMNS = (("files", "src"), ("sessions", "src"))
 
 SCHEMA = r"""
 CREATE TABLE IF NOT EXISTS files (
@@ -29,7 +32,8 @@ CREATE TABLE IF NOT EXISTS files (
   n_bad INTEGER NOT NULL DEFAULT 0,
   resets INTEGER NOT NULL DEFAULT 0,
   missing INTEGER NOT NULL DEFAULT 0,
-  first_seen TEXT, last_ingest TEXT
+  first_seen TEXT, last_ingest TEXT,
+  src TEXT NOT NULL DEFAULT 'claude'
 );
 
 CREATE TABLE IF NOT EXISTS excl (
@@ -114,7 +118,8 @@ CREATE INDEX IF NOT EXISTS cards_sid ON cards(sid);
 
 CREATE TABLE IF NOT EXISTS sessions (
   sid TEXT PRIMARY KEY, project TEXT, cwd TEXT, title TEXT,
-  first_ts TEXT, last_ts TEXT, n_cards INTEGER, entry TEXT, built TEXT
+  first_ts TEXT, last_ts TEXT, n_cards INTEGER, entry TEXT, built TEXT,
+  src TEXT NOT NULL DEFAULT 'claude'
 );
 
 CREATE TABLE IF NOT EXISTS exports (
@@ -176,8 +181,18 @@ def connect(path=None, readonly=False):
     return con
 
 
+def has_column(con, table, col):
+    try:
+        return any(r[1] == col for r in con.execute('PRAGMA table_info("%s")' % table))
+    except sqlite3.OperationalError:
+        return False
+
+
 def init(con):
     con.executescript(SCHEMA)
+    for t, c in SRC_COLUMNS:
+        if not has_column(con, t, c):
+            con.execute("ALTER TABLE %s ADD COLUMN %s TEXT NOT NULL DEFAULT 'claude'" % (t, c))
     # FTS5 는 지운 행의 trigram 게시 목록을 병합 전까지 fts_data 에 남긴다. secure-delete 를 켜면 지울 때 바로 없앤다
     # (SQLite 3.44+, 시스템 3.51). PRAGMA secure_delete 는 b-tree 만 덮으므로 따로 켠다.
     r = con.execute("SELECT v FROM fts_config WHERE k='secure-delete'").fetchone()

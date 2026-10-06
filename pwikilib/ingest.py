@@ -18,6 +18,7 @@ import re
 import time
 
 from . import cards as cards_mod
+from . import codex as codex_mod
 from . import db as dbm
 from . import parse
 from . import paths
@@ -110,6 +111,67 @@ def discover(claude, project=None, unrec=None):
         hp = os.path.join(claude, "history.jsonl")
         if os.path.isfile(hp):
             out.append(("history.jsonl", "history", None, None, "jsonl"))
+    out.extend(discover_codex(paths.codex_dir(), project))
+    return out
+
+
+_ROLLOUT_RX = re.compile(r"^rollout-.*?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$")
+CODEX_HEAD_LINES = 64
+CODEX_HEAD_BYTES = 8 << 20
+
+
+def _codex_head(ap):
+    """rollout 파일 앞쪽(개행으로 끝난 줄만)에서 (세션 id, cwd). 첫 줄이 아직 덜 쓰였으면 None."""
+    sid = cwd = None
+    n = 0
+    with open(ap, "rb") as fh:
+        while n < CODEX_HEAD_LINES:
+            raw = fh.readline(CODEX_HEAD_BYTES)
+            if not raw.endswith(b"\n"):
+                return None if n == 0 else (sid, cwd)
+            n += 1
+            try:
+                o = json.loads(raw)
+            except ValueError:
+                continue
+            s2, c2 = codex_mod.session_head(o)
+            sid = sid or s2
+            cwd = cwd or c2
+            if sid and cwd:
+                break
+    return sid, cwd
+
+
+def discover_codex(codex, project=None):
+    """Codex CLI 원천: sessions/**/rollout-*.jsonl 과 history.jsonl 만. 상대경로 앞에 'codex/' 를 붙인다.
+    그 밖의 파일(auth.json·config.toml·sqlite·logs 등)은 열지도 목록에 넣지도 않는다. 링크 파일은 따라가지 않는다."""
+    out = []
+    sdir = os.path.join(codex, "sessions")
+    # 시작 폴더가 링크면 os.walk 가 따라가므로 여기서 막는다(하위 폴더 링크는 walk 기본값이 따라가지 않는다)
+    if not os.path.isdir(codex) or os.path.islink(codex.rstrip(os.sep)) or os.path.islink(sdir):
+        return out
+    for dp, dn, fn in os.walk(sdir):
+        dn.sort()
+        for f in sorted(fn):
+            m = _ROLLOUT_RX.match(f)
+            ap = os.path.join(dp, f)
+            if not m or os.path.islink(ap) or not os.path.isfile(ap):
+                continue
+            try:
+                head = _codex_head(ap)
+            except OSError:
+                continue
+            if head is None:
+                continue
+            sid, cwd = head
+            proj = project_from_cwd(cwd) or codex_mod.FALLBACK_PROJECT
+            if project and proj != project:
+                continue
+            rel = paths.CODEX_PREFIX + os.path.relpath(ap, codex).replace(os.sep, "/")
+            out.append((rel, "session", proj, sid or m.group(1), "jsonl"))
+    hp = os.path.join(codex, "history.jsonl")
+    if not project and os.path.isfile(hp) and not os.path.islink(hp):
+        out.append((paths.CODEX_PREFIX + "history.jsonl", "history", None, None, "jsonl"))
     return out
 
 
@@ -215,7 +277,7 @@ def harvest_pass(con, claude, srcs, H, found, stats):
     """가림 전에, 이번 실행에서 새로 읽을 바이트(줄 파일)와 바뀐 문서에서 비밀번호·토큰 문맥의 값을 모은다.
     모은 값은 이번 실행의 가림(알려진 값)에 들어가므로, 같은 값이 다른 문맥에 먼저 나와도 가려진다."""
     for rel, kind, proj, sid, how in srcs:
-        ap = os.path.join(claude, rel)
+        ap = paths.source_path(rel, claude)
         try:
             st = os.stat(ap)
         except FileNotFoundError:
@@ -275,8 +337,9 @@ class Ingestor:
     # -- jsonl ---------------------------------------------------------------
     def ingest_jsonl(self, rel, kind, project, sid_hint):
         con = self.con
-        ap = os.path.join(self.claude, rel)
+        ap = paths.source_path(rel, self.claude)
         fid = fid_of(rel)
+        src = paths.source_of(rel)
         try:
             st = os.stat(ap)
         except FileNotFoundError:
@@ -289,9 +352,9 @@ class Ingestor:
         try:
             now = paths.now_utc_iso()
             if row is None:
-                con.execute("INSERT INTO files(path, fid, kind, project, sid, inode, dev, size, mtime, off, first_seen) "
-                            "VALUES (?,?,?,?,?,?,?,?,?,0,?)",
-                            (rel, fid, kind, project, sid_hint, st.st_ino, st.st_dev, st.st_size, st.st_mtime, now))
+                con.execute("INSERT INTO files(path, fid, kind, project, sid, inode, dev, size, mtime, off, first_seen, src) "
+                            "VALUES (?,?,?,?,?,?,?,?,?,0,?,?)",
+                            (rel, fid, kind, project, sid_hint, st.st_ino, st.st_dev, st.st_size, st.st_mtime, now, src))
                 n_lines = n_uuid = n_bad = 0
                 resets = 0
             else:
@@ -309,7 +372,19 @@ class Ingestor:
             ctx = {"fid": fid, "rel": rel, "kind": kind, "project": project, "sid_hint": sid_hint,
                    "reset": reset, "ls_have": ls_have, "ls_seen": collections.Counter(), "seen": set(),
                    "excl": collections.Counter(), "excl_b": collections.Counter(),
-                   "strips": {}, "n_lines": 0, "n_uuid": 0, "n_bad": 0, "stored": 0}
+                   "strips": {}, "n_lines": 0, "n_uuid": 0, "n_bad": 0, "stored": 0, "codex": None}
+            if src == "codex":
+                ctx["codex"] = codex_mod.new_state(sid_hint, fid)
+                if kind == "session" and start > 0:
+                    # 이어 읽기: 상태(cwd·판·모델·exec 여부)는 이 파일의 마지막 session_meta·turn_context 행에서 되살린다
+                    for sub in (codex_mod.SUB_META, codex_mod.SUB_TURN):
+                        r = con.execute("SELECT raw FROM events WHERE fid=? AND sub=? AND off<? ORDER BY off DESC LIMIT 1",
+                                        (fid, sub, start)).fetchone()
+                        if r:
+                            try:
+                                codex_mod.restore(ctx["codex"], json.loads(r[0]))
+                            except ValueError:
+                                pass
             pos = start
             for raw, off in iter_lines(ap, start, st.st_size):
                 self._line(raw, off, ctx)
@@ -366,6 +441,15 @@ class Ingestor:
         if not isinstance(o, dict):
             self._excl(ctx, "not_object", False, len(raw))
             return
+        if ctx["codex"] is not None:
+            # Codex 줄은 Claude 모양으로 옮긴 뒤 같은 길(가림·분류·추출)로 적재한다. 옮기지 않는 줄은 사유별로 센다.
+            if ctx["kind"] == "history":
+                o, why = codex_mod.normalize_history(o)
+            else:
+                o, why = codex_mod.normalize(o, ctx["codex"], off)
+            if o is None:
+                self._excl(ctx, why, False, len(raw))
+                return
         uuid = o.get("uuid") if isinstance(o.get("uuid"), str) and o.get("uuid") else None
         if uuid:
             ctx["n_uuid"] += 1
@@ -476,7 +560,7 @@ class Ingestor:
     # -- 문서(덧붙이기 아님) ----------------------------------------------------
     def ingest_doc(self, rel, kind, project, sid):
         con = self.con
-        ap = os.path.join(self.claude, rel)
+        ap = paths.source_path(rel, self.claude)
         try:
             st = os.stat(ap)
             with open(ap, "rb") as fh:

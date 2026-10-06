@@ -289,7 +289,7 @@ def verify(con):
     missing = 0
     for path, fid, off, kind in con.execute("SELECT path, fid, off, kind FROM files WHERE kind IN "
                                             "('session','subagent','wf_agent','journal','history')"):
-        ap = os.path.join(claude, path)
+        ap = paths.source_path(path, claude)
         if not os.path.exists(ap):
             missing += 1
             continue

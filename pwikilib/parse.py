@@ -80,7 +80,7 @@ KNOWN_FIELDS = {
                          "content", "pendingWorkflowCount", "pendingBackgroundAgentCount", "logicalParentUuid",
                          "compactMetadata", "url", "commandRun", "taskId", "cron", "prompt", "trigger", "direction", "scope",
                          "originalModel", "fallbackModel", "requestId", "apiRefusalCategory", "apiRefusalExplanation",
-                         "retractedMessageUuids", "refusedUserMessageUuid"},
+                         "retractedMessageUuids", "refusedUserMessageUuid", "codex"},
     "attachment": _COMMON | {"attachment", "rendered", "renderedInHumanTurn", "renderedRole"},
     "queue-operation": {"type", "operation", "timestamp", "sessionId", "content", "reason", "commandUuid"},
     "ai-title": {"type", "aiTitle", "sessionId"},
@@ -108,6 +108,9 @@ SUBAGENT_TOOLS = {"Agent", "Task"}
 WORKFLOW_TOOLS = {"Workflow"}
 TODO_TOOLS = {"TodoWrite"}
 PLAN_TOOLS = {"EnterPlanMode", "ExitPlanMode"}
+# Codex CLI 도구(pwikilib/codex.py 가 Claude 모양으로 옮긴 줄): 셸 명령은 cmd, 패치로 바뀐 파일은 fpath 로 뽑는다.
+CODEX_CMD_TOOLS = {"exec_command", "shell", "shell_command", "local_shell"}
+CODEX_CHANGE_TOOLS = {"apply_patch", "file_change"}
 
 DENIAL_MARKERS = (
     "The user doesn't want to proceed with this tool use",
@@ -575,9 +578,9 @@ def extract(o, kind, sub):
                 name = b.get("name") or "?"
                 summ = tool_input_summary(name, b.get("input"))
                 fpath = None
-                if name in CHANGE_TOOLS:
+                if name in CHANGE_TOOLS or name in CODEX_CHANGE_TOOLS:
                     fpath = summ.get("file_path") or summ.get("notebook_path")
-                cmd = first_line(summ.get("command"), 160) if name == "Bash" else None
+                cmd = first_line(summ.get("command"), 160) if name == "Bash" or name in CODEX_CMD_TOOLS else None
                 out["tool_uses"].append({"tuid": b.get("id"), "idx": i, "name": name, "fpath": fpath, "cmd": cmd,
                                          "inp": json.dumps(summ, ensure_ascii=False)})
                 parts.append(tool_input_text(name, summ))

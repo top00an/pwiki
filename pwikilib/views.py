@@ -3,6 +3,7 @@ import collections
 import json
 import os
 import re
+import sqlite3
 
 from . import parse
 from . import paths
@@ -18,6 +19,15 @@ def short_project(p):
     if p.startswith(HOME_PREFIX + "-"):
         return p[len(HOME_PREFIX) + 1:]
     return p
+
+
+def is_codex_session(con, sid):
+    """Codex CLI 세션인가(sessions.src). src 열이 없는 옛 DB(읽기 전용 연결은 init 을 돌리지 않는다)면 아니다."""
+    try:
+        r = con.execute("SELECT src FROM sessions WHERE sid=?", (sid,)).fetchone()
+    except sqlite3.OperationalError:
+        return False
+    return bool(r) and r[0] == "codex"
 
 
 def fmt_dur(s):
@@ -249,6 +259,8 @@ def day(con, date):
                 if name not in names and any((c[2] or "") <= ts <= (c[13] or c[2] or "") for c in cs):
                     names.append(name)
             head = ["### %s" % sid[:8]]
+            if is_codex_session(con, sid):
+                head.append("Codex")
             if titles[sid]:
                 head.append(one_line(titles[sid], 30))
             head.append("카드 %d · 소요 %s" % (len(cs), fmt_dur(sum(c[3] or 0 for c in cs))))
@@ -674,7 +686,9 @@ def pending_sessions(con, project, now, exclude=(), limit=5):
     lo = t_now - datetime.timedelta(seconds=RECENT_S + 1800)
     hi = t_now + datetime.timedelta(seconds=60)  # 측정용 과거 시각(now)보다 뒤에 바뀐 파일은 그 시각에 몰랐던 것이다
     known = {}
-    for path, size in con.execute("SELECT path, size FROM files WHERE project=? AND kind='session'", (project,)):
+    # Codex 세션(path 'codex/…')은 이 폴더에 없으므로 보지 않는다(이어 하기 훅은 Claude Code 만)
+    for path, size in con.execute("SELECT path, size FROM files WHERE project=? AND kind='session'"
+                                  " AND path NOT LIKE 'codex/%'", (project,)):
         known[os.path.basename(path or "")] = size
     found = []
     try:
@@ -797,7 +811,7 @@ def resume(con, project, max_chars=4000, exclude=(), now=None):
     sess = con.execute("SELECT title, first_ts, last_ts, n_cards, cwd FROM sessions WHERE sid=?", (top["sid"],)).fetchone()
     title, fts, lts, ncards, cwd = sess or (None, None, None, 0, None)
     secs = [("마지막 세션(가장 최근 사람 입력 기준)", [
-        "- 세션: %s" % top["sid"],
+        "- 세션: %s%s" % (top["sid"], " · Codex" if is_codex_session(con, top["sid"]) else ""),
         "- 제목: %s" % (one_line(title, 100) if title else "(없음)"),
         "- 기간: %s ~ %s · 카드 %d장" % (paths.kst_str(fts), paths.kst_str_z(max(lts or "", top["last_ts"] or "") or None),
                                          ncards or 0),

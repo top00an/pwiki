@@ -10,7 +10,7 @@ Keeps history past the 30-day cleanup · masks secrets before storing · restore
 ![Dependencies](https://img.shields.io/badge/dependencies-standard%20library%20only-2f6fde)
 ![LLM](https://img.shields.io/badge/LLM-none-0f7b5f)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-555)
-![Version](https://img.shields.io/badge/version-0.1.0-555)
+![Version](https://img.shields.io/badge/version-0.2.0-555)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 
 **English** · [한국어](README.ko.md)
@@ -99,13 +99,14 @@ Keep the checkout out of `~/pwiki`: that is the default vault location.
 | Path | What happens there | When |
 |---|---|---|
 | `~/.claude/projects`, `history.jsonl`, memory files | **Read only.** Never modified or deleted | every ingest |
+| `~/.codex/sessions/**/rollout-*.jsonl`, `~/.codex/history.jsonl` | **Read only**, and nothing else under `~/.codex` (no `auth.json`, no `config.toml`) | every ingest, if Codex CLI is installed |
 | `~/.pwiki/` (mode 700) | Database, logs, your secret list | install, every ingest |
 | `~/pwiki/` | Markdown pages for Obsidian | `pwiki export` |
 | `~/Library/LaunchAgents/local.pwiki.collect.plist` | 30-minute collector (macOS) | optional install step |
 | `~/.claude/settings.json` | One SessionStart hook group appended; `./uninstall.sh` removes it | optional install step |
 | `~/.claude/skills/pwiki/SKILL.md` | The `/pwiki` skill; `./uninstall.sh` removes it (never overwrites a file it did not write) | optional install step |
 
-pwiki never writes `CLAUDE.md`, never touches your project folders, and never opens a network connection.
+pwiki never writes `CLAUDE.md`, never touches your project folders, and never opens a network connection. The one exception is `pwiki update`, which runs `git fetch` against the repository you cloned from.
 
 ## Requirements
 
@@ -164,6 +165,7 @@ Unknown values fall back to KST. For the resume hook, set it where Claude Code c
 | `pwiki redact-check` | Count secrets left in the DB, WAL, search index, vault and logs (values are never printed) |
 | `pwiki rederive [--apply]` | Re-apply the current redaction, classification and card rules to stored rows |
 | `pwiki eff` | Efficiency metrics (numbers only) |
+| `pwiki update [--check]` | Get the latest release and re-apply your install choices. `--check` only reports |
 
 The collector only updates the database. The vault is refreshed when you run `pwiki export`.
 
@@ -267,6 +269,27 @@ pwiki redact-check                 # remaining count (should be 0)
 
 The full list of rules, what they can miss, and how to read `redact-check` is in [docs/REDACTION.md](docs/REDACTION.md).
 
+## Codex CLI
+
+If you also use OpenAI Codex CLI, pwiki picks up its sessions automatically; there is nothing to turn on.
+Codex sessions show up in `today`, `day`, `search` and `resume` next to Claude Code sessions (`today`, `day` and `resume` mark them `Codex`), and sessions from the same work folder are grouped under one project.
+
+- Only `~/.codex/sessions/**/rollout-*.jsonl` and `~/.codex/history.jsonl` are read. Set `PWIKI_CODEX_DIR` if your Codex home is elsewhere.
+- Secrets are masked the same way, and `pwiki verify` and `pwiki redact-check` cover Codex files too.
+- The resume hook is still Claude Code only.
+
+## Update
+
+```sh
+pwiki update --check   # is there a new release? changes nothing
+pwiki update           # fast-forward, re-run install.sh with your recorded choices, show what changed
+```
+
+- `pwiki update` reruns `install.sh` with the collector, hook and skill choices recorded in `~/.pwiki/install.json`. A feature you turned off stays off. The record keeps a feature as on once you installed it, so to drop one for good, run `./uninstall.sh` and then `./install.sh` with the choices you want.
+- If you edited files in the checkout, it stops and tells you which ones instead of overwriting them.
+- Without `pwiki update` (an older install, or a download instead of a clone): `git pull --ff-only && ./install.sh`.
+- To hear about new releases, open the GitHub repository and choose **Watch → Custom → Releases**. Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+
 ## Uninstall
 
 ```sh
@@ -302,7 +325,7 @@ Claude Code's own history (`~/.claude`) is never deleted.
 
 ## Roadmap
 
-- **Codex CLI support**: read `~/.codex/sessions` rollouts into the same database, timeline and search. Next up.
+- **Resume hook for Codex CLI**: Codex sessions are collected and searchable since 0.2.0; adding context when a Codex session starts is next.
 - **English output option**: command output is Korean today.
 - **More agent CLIs** (OpenCode, Copilot CLI) if there is demand.
 
@@ -316,11 +339,13 @@ pwikilib/
   ingest.py             ingest (the only writer to the database)
   parse.py              per-line classification, cleanup, extraction
   redact.py             secret redaction
+  codex.py              Codex CLI lines → the same shape as Claude Code lines
   cards.py              work cards
   views.py              today, day, resume, search, eff (read-only)
   export.py             Obsidian vault export
   check.py, leakscan.py verify, redact-check, independent leak scan
   db.py, rederive.py    schema, re-applying rules
+  update.py             pwiki update
 install/                installer helpers, collector, resume hook, Claude Code skill
 tools/                  synthetic history generator, dist builder, dist leak check
 tests/                  tests that run on synthetic history only

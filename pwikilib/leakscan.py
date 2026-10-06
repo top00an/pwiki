@@ -169,7 +169,7 @@ def extract_source_values(claude=None, limit_bytes=None):
     found = {}
     stats = collections.Counter()
     for rel, kind, proj, sid, how in discover(claude):
-        ap = os.path.join(claude, rel)
+        ap = paths.source_path(rel, claude)
         try:
             with open(ap, "rb") as fh:
                 if how == "jsonl":

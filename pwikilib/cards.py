@@ -130,6 +130,8 @@ def build_session(con, sid):
         _insert(con, c)
     con.execute("INSERT OR REPLACE INTO sessions(sid, project, cwd, title, first_ts, last_ts, n_cards, entry, built)"
                 " VALUES (?,?,?,?,?,?,?,?,?)", srow)
+    if con.execute("SELECT 1 FROM files WHERE sid=? AND kind='session' AND src='codex' LIMIT 1", (sid,)).fetchone():
+        con.execute("UPDATE sessions SET src='codex' WHERE sid=?", (sid,))
     return len(all_cards)
 
 
