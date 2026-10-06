@@ -5,7 +5,7 @@ All notable changes to pwiki. Versions follow `pwikilib/__init__.py`. Update an 
 ## [0.2.0] - 2026-10-06
 
 ### Added
-- **Codex CLI support**: `~/.codex/sessions/**/rollout-*.jsonl` and `~/.codex/history.jsonl` go into the same database, so `today`, `day`, `search`, `resume` and `/pwiki` show Codex sessions next to Claude Code ones (marked `Codex`). Nothing else under `~/.codex` is opened (no `auth.json`, no `config.toml`). Override the location with `PWIKI_CODEX_DIR`.
+- **Codex CLI support**: `~/.codex/sessions/**/rollout-*.jsonl` and `~/.codex/history.jsonl` go into the same database, so `today`, `day`, `search`, `resume` and `/pwiki` show Codex sessions next to Claude Code ones (`today`, `day` and `resume` mark them `Codex`). Nothing else under `~/.codex` is opened (no `auth.json`, no `config.toml`). Override the location with `PWIKI_CODEX_DIR`.
 - `pwiki update` and `pwiki update --check`: fast-forward a git-clone install and re-run `install.sh` with the choices recorded at install time. Local edits are never overwritten.
 - Claude Code skill: use pwiki inside a session with `/pwiki` or plain questions (installer `--skill`).
 - `PWIKI_TZ` display time zone (KST by default; `local`, `UTC`, fixed offsets, IANA names).
