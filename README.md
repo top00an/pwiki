@@ -2,9 +2,9 @@
 
 # pwiki
 
-**Turn your Claude Code history into a local, searchable wiki**
+**Keep, mask and resume your Claude Code history. Locally, with no LLM.**
 
-Work cards · daily timeline · full-text search · "pick up where I left off" · Obsidian vault
+Keeps history past the 30-day cleanup · masks secrets before storing · restores context after `/clear`
 
 ![Python](https://img.shields.io/badge/python-3.9%2B-3776AB?logo=python&logoColor=white)
 ![Dependencies](https://img.shields.io/badge/dependencies-standard%20library%20only-2f6fde)
@@ -19,13 +19,17 @@ Work cards · daily timeline · full-text search · "pick up where I left off" �
 
 ---
 
-Claude Code writes every conversation to JSONL files under `~/.claude`, but those files are hard to read back.
-pwiki gathers them into one SQLite database on your machine so you can answer **what did I do yesterday, where did I run that command, and where did I leave off** in a second.
+Claude Code **permanently deletes session transcripts older than 30 days** (`cleanupPeriodDays`), and finding something you did weeks ago means digging through raw JSONL files.
+pwiki copies that history into one SQLite database on your machine before it disappears, masks secrets on the way in, and hands the gist of your last session back to Claude Code when you start a new one.
 
-- **No LLM calls.** The same history always gives the same result.
-- **Python standard library only.** Nothing to `pip install`.
-- **No network.** Your history and the database never leave your machine.
-- **Secrets are redacted first.** Password- and token-like values become `[REDACTED:…]` before anything is stored.
+- **Keep**: everything stays searchable after Claude Code's 30-day cleanup.
+- **Mask**: password- and token-like values become `[REDACTED:…]` before anything is stored. See [what is covered](docs/REDACTION.md).
+- **Resume**: after `/clear` or in a new session, a SessionStart hook adds your last request, answer, open to-dos and the day's work as context.
+- **Find**: a daily timeline of what you asked, and full-text search over every session.
+
+No LLM calls, no network, no `pip install`: just the Python standard library. The same history always gives the same result.
+
+![pwiki demo](docs/images/demo.gif)
 
 ## How it works
 
@@ -58,13 +62,29 @@ On macOS a launchd job runs ingest every 30 minutes, and the resume hook runs wh
 ## Quick start
 
 ```sh
-git clone <repo-url> ~/src/pwiki    # avoid ~/pwiki: it is the default vault location
-cd ~/src/pwiki
-./install.sh                         # asks before each step
+git clone <repo-url> ~/src/pwiki && ~/src/pwiki/install.sh
+```
 
+The installer asks before each optional step (auto-collect, resume hook). Then:
+
+```sh
 alias pwiki='/usr/bin/python3 ~/src/pwiki/pwiki'
 pwiki today
 ```
+
+Keep the checkout out of `~/pwiki`: that is the default vault location.
+
+## What pwiki touches
+
+| Path | What happens there | When |
+|---|---|---|
+| `~/.claude/projects`, `history.jsonl`, memory files | **Read only.** Never modified or deleted | every ingest |
+| `~/.pwiki/` (mode 700) | Database, logs, your secret list | install, every ingest |
+| `~/pwiki/` | Markdown pages for Obsidian | `pwiki export` |
+| `~/Library/LaunchAgents/local.pwiki.collect.plist` | 30-minute collector (macOS) | optional install step |
+| `~/.claude/settings.json` | One SessionStart hook group appended; `./uninstall.sh` removes it | optional install step |
+
+pwiki never writes `CLAUDE.md`, never touches your project folders, and never opens a network connection.
 
 ## Requirements
 
@@ -73,11 +93,25 @@ pwiki today
 - SQLite 3.34+ with FTS5 trigram support. The installer checks this first and stops with a reason if it is missing.
 - A Claude Code history folder (`~/.claude/projects`). Point `PWIKI_CLAUDE_DIR` elsewhere if needed.
 
+## Time zone
+
+Dates and day boundaries use **KST (UTC+9) by default**. Set `PWIKI_TZ` to change them. The database stores UTC, so it never needs rebuilding; vault day pages follow the zone in effect when you run `pwiki export`.
+
+| `PWIKI_TZ` | Example label |
+|---|---|
+| unset or `KST` | `KST` (default) |
+| `local` | your system time zone, for example `PDT` |
+| `UTC` | `UTC` |
+| `+05:30`, `-08:00`, `UTC+9` | `UTC+05:30` |
+| `America/Los_Angeles`, `Europe/Berlin` | `PDT`, `CEST` (daylight saving handled) |
+
+Unknown values fall back to KST. For the resume hook, set it where Claude Code can see it, for example in your shell profile or in the `env` block of `~/.claude/settings.json`.
+
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `pwiki today` | Today's cards by project (KST) |
+| `pwiki today` | Today's cards by project (in `PWIKI_TZ`, KST by default) |
 | `pwiki day 2026-10-01` | Cards for a given day |
 | `pwiki search "words" [--project P] [--since D] [--kind human] [--all]` | Full-text search. Subagent and workflow logs are excluded unless `--all` |
 | `pwiki show <key>` | Full (redacted) text for any key printed by search, resume or day |
@@ -188,6 +222,8 @@ pwiki redact-check                 # remaining count (should be 0)
 
 `secrets.local` and the harvested list (`secrets.harvested`) contain the real values. Never copy or share them.
 
+The full list of rules, what they can miss, and how to read `redact-check` is in [docs/REDACTION.md](docs/REDACTION.md).
+
 ## Uninstall
 
 ```sh
@@ -217,10 +253,17 @@ Claude Code's own history (`~/.claude`) is never deleted.
 
 ## Limitations
 
-- Times are fixed to KST (UTC+9). Day boundaries and labels are off in other time zones.
 - macOS first. On Linux, ingest, search and the hook work, but you add the crontab line yourself. Windows is untested.
 - Command output is in Korean.
 - Claude Code's log format is not a public spec. When it changes, unknown lines are stored as `kind=unknown`; `pwiki verify` shows the breakdown.
+
+## Roadmap
+
+- **Codex CLI support**: read `~/.codex/sessions` rollouts into the same database, timeline and search. Next up.
+- **English output option**: command output is Korean today.
+- **More agent CLIs** (OpenCode, Copilot CLI) if there is demand.
+
+Ideas and bug reports are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). For redaction misses or anything that exposes data, follow [SECURITY.md](SECURITY.md).
 
 ## Repository layout
 
@@ -238,6 +281,8 @@ pwikilib/
 install/                installer helpers, collector, resume hook
 tools/                  synthetic history generator, dist builder, dist leak check
 tests/                  tests that run on synthetic history only
+docs/                   redaction guide, README images
+SECURITY.md, CONTRIBUTING.md, LICENSE, NOTICE
 ```
 
 ## Tests

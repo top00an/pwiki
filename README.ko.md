@@ -2,9 +2,9 @@
 
 # pwiki
 
-**Claude Code 작업 기록을 내 컴퓨터 안의 위키로**
+**Claude Code 기록을 남기고, 가리고, 이어 줍니다. 내 컴퓨터 안에서, LLM 없이.**
 
-작업 카드 · 하루 타임라인 · 전문 검색 · 이어 하기 · Obsidian vault
+30일 자동 삭제 뒤에도 보존 · 저장 전에 비밀값 가림 · `/clear` 뒤에도 맥락 복원
 
 ![Python](https://img.shields.io/badge/python-3.9%2B-3776AB?logo=python&logoColor=white)
 ![Dependencies](https://img.shields.io/badge/dependencies-standard%20library%20only-2f6fde)
@@ -19,13 +19,17 @@
 
 ---
 
-Claude Code 는 모든 대화를 `~/.claude` 아래 JSONL 파일로 남깁니다. 하지만 그 기록을 다시 찾아 읽기는 어렵습니다.
-pwiki 는 이 기록을 내 컴퓨터 안의 SQLite DB 하나로 모아, **어제 무엇을 했는지, 그 명령을 어디서 썼는지, 어디까지 했는지**를 바로 답합니다.
+Claude Code 는 **30일이 지난 세션 기록을 영구 삭제합니다**(`cleanupPeriodDays`). 몇 주 전에 한 일을 찾으려면 JSONL 원문을 뒤져야 합니다.
+pwiki 는 기록이 지워지기 전에 내 컴퓨터 안의 SQLite DB 하나로 옮기고, 저장하면서 비밀값을 가리고, 새 세션을 열 때 지난 세션의 요점을 Claude Code 에 돌려줍니다.
 
-- **LLM 을 부르지 않습니다.** 같은 기록이면 언제나 같은 결과가 나옵니다.
-- **표준 라이브러리만 씁니다.** 설치할 패키지가 없습니다.
-- **네트워크를 쓰지 않습니다.** 기록과 DB 는 내 컴퓨터 밖으로 나가지 않습니다.
-- **비밀값을 먼저 가립니다.** 비밀번호·토큰 모양 값은 저장하기 전에 `[REDACTED:…]` 로 바뀝니다.
+- **보존**: Claude Code 가 30일 뒤 지운 기록도 그대로 검색됩니다.
+- **가림**: 비밀번호·토큰 모양 값은 저장하기 전에 `[REDACTED:…]` 로 바뀝니다. [무엇을 가리는지](docs/REDACTION.ko.md)
+- **이어 하기**: `/clear` 뒤나 새 세션에서, SessionStart 훅이 마지막 요청·답·미완 할 일·그날 작업을 문맥으로 붙입니다.
+- **찾기**: 사람 입력 단위의 하루 타임라인과 모든 세션 전문 검색.
+
+LLM 을 부르지 않고, 네트워크를 쓰지 않고, 설치할 패키지도 없습니다(파이썬 표준 라이브러리만). 같은 기록이면 언제나 같은 결과가 나옵니다.
+
+![pwiki 데모](docs/images/demo.gif)
 
 ## 동작 구조
 
@@ -58,13 +62,29 @@ pwiki 는 이 기록을 내 컴퓨터 안의 SQLite DB 하나로 모아, **어�
 ## 빠른 시작
 
 ```sh
-git clone <저장소 주소> ~/src/pwiki    # ~/pwiki 는 vault 기본 위치라 피합니다
-cd ~/src/pwiki
-./install.sh                             # 단계마다 묻습니다
+git clone <저장소 주소> ~/src/pwiki && ~/src/pwiki/install.sh
+```
 
+설치기는 선택 단계(자동 수집, 이어 하기 훅)마다 묻습니다. 그다음:
+
+```sh
 alias pwiki='/usr/bin/python3 ~/src/pwiki/pwiki'
 pwiki today
 ```
+
+저장소는 `~/pwiki` 에 두지 않습니다. 그 자리는 vault 기본 위치입니다.
+
+## pwiki 가 건드리는 곳
+
+| 경로 | 하는 일 | 언제 |
+|---|---|---|
+| `~/.claude/projects`, `history.jsonl`, 메모리 파일 | **읽기만.** 고치거나 지우지 않음 | 수집할 때마다 |
+| `~/.pwiki/` (권한 700) | DB, 로그, 내가 적은 비밀값 목록 | 설치, 수집할 때마다 |
+| `~/pwiki/` | Obsidian 용 마크다운 페이지 | `pwiki export` |
+| `~/Library/LaunchAgents/local.pwiki.collect.plist` | 30분마다 수집(macOS) | 설치 선택 단계 |
+| `~/.claude/settings.json` | SessionStart 훅 그룹 하나 덧붙임. `./uninstall.sh` 가 뺌 | 설치 선택 단계 |
+
+pwiki 는 `CLAUDE.md` 를 쓰지 않고, 작업 폴더를 건드리지 않고, 네트워크에 연결하지 않습니다.
 
 ## 요구 사항
 
@@ -73,11 +93,25 @@ pwiki today
 - SQLite 3.34 이상, FTS5 trigram 지원. 설치기가 먼저 확인하고, 없으면 이유를 말하고 멈춥니다.
 - Claude Code 기록 폴더(`~/.claude/projects`). 다른 곳이면 `PWIKI_CLAUDE_DIR` 로 줍니다.
 
+## 시간대
+
+날짜와 하루 경계는 **기본 KST(UTC+9)** 입니다. `PWIKI_TZ` 로 바꿀 수 있습니다. DB 는 UTC 로 저장하므로 다시 만들 필요가 없고, vault 의 날짜 페이지는 `pwiki export` 를 돌릴 때의 시간대를 따릅니다.
+
+| `PWIKI_TZ` | 표시 예 |
+|---|---|
+| 비움 또는 `KST` | `KST` (기본) |
+| `local` | 시스템 시간대, 예: `PDT` |
+| `UTC` | `UTC` |
+| `+05:30`, `-08:00`, `UTC+9` | `UTC+05:30` |
+| `America/Los_Angeles`, `Europe/Berlin` | `PDT`, `CEST` (서머타임 반영) |
+
+알아보지 못하는 값이면 KST 로 둡니다. 이어 하기 훅에도 적용하려면 셸 프로필이나 `~/.claude/settings.json` 의 `env` 처럼 Claude Code 가 보는 곳에 둡니다.
+
 ## 명령
 
 | 명령 | 하는 일 |
 |---|---|
-| `pwiki today` | 오늘(KST) 프로젝트별 카드 목록 |
+| `pwiki today` | 오늘 프로젝트별 카드 목록(`PWIKI_TZ`, 기본 KST) |
 | `pwiki day 2026-10-01` | 그날 카드 목록 |
 | `pwiki search "낱말" [--project P] [--since D] [--kind human] [--all]` | 전문 검색. 기본은 하위 에이전트·워크플로 기록을 빼고, `--all` 이면 넣습니다 |
 | `pwiki show <키>` | search·resume·day 출력의 키 하나의 전문(가린 뒤 저장된 글) |
@@ -188,6 +222,8 @@ pwiki redact-check                 # 남은 개수 확인(0 이어야 한다)
 
 `secrets.local` 과 수확값 파일(`secrets.harvested`)에는 원래 값이 들어 있습니다. 복사하거나 공유하지 않습니다.
 
+규칙 전체 목록, 놓칠 수 있는 것, `redact-check` 읽는 법은 [docs/REDACTION.ko.md](docs/REDACTION.ko.md) 에 있습니다.
+
 ## 제거
 
 ```sh
@@ -217,10 +253,17 @@ Claude Code 원래 기록(`~/.claude`)은 어떤 경우에도 지우지 않습�
 
 ## 한계
 
-- 시각은 KST(UTC+9) 고정입니다. 다른 시간대에서는 날짜 경계와 표시가 어긋납니다.
 - 맥 우선입니다. 리눅스는 수집·검색·훅이 동작하지만 자동 수집은 crontab 을 직접 넣습니다. 윈도는 시험하지 않았습니다.
 - 출력 문구는 한국어입니다.
 - Claude Code 기록 형식은 공개 규격이 아닙니다. 판이 바뀌면 일부 줄을 모르는 형식(`kind=unknown`)으로 적재합니다. `pwiki verify` 의 형식 분포에서 볼 수 있습니다.
+
+## 로드맵
+
+- **Codex CLI 지원**: `~/.codex/sessions` 기록을 같은 DB·타임라인·검색에 넣습니다. 다음 작업입니다.
+- **영어 출력 옵션**: 지금 출력 문구는 한국어입니다.
+- **다른 에이전트 CLI**(OpenCode, Copilot CLI): 수요가 있으면 검토합니다.
+
+제안과 버그 신고는 [CONTRIBUTING.md](CONTRIBUTING.md) 를 봐 주세요. 가림 누락이나 데이터 노출은 [SECURITY.md](SECURITY.md) 절차로 알려 주세요.
 
 ## 저장소 구성
 
@@ -238,6 +281,8 @@ pwikilib/
 install/                설치 도우미, 수집기, 이어 하기 훅
 tools/                  합성 기록 생성기, 배포본 생성기, 배포본 누출 검사
 tests/                  합성 기록으로만 도는 시험
+docs/                   가림 안내, README 그림
+SECURITY.md, CONTRIBUTING.md, LICENSE, NOTICE
 ```
 
 ## 시험

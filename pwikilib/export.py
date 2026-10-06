@@ -109,7 +109,7 @@ def build_pages(con):
                                           ("auto_cards", len(groups["auto"])), ("no_human_cards", len(groups["no_human"])),
                                           ("undelivered_queue", len(groups["ghost"])),
                                           ("projects", [short_project(p) for p in projs])]))
-        body = [fm, "", NOTICE, "", "# %s 작업 타임라인 (KST)" % d, "",
+        body = [fm, "", NOTICE, "", "# %s 작업 타임라인 (%s)" % (d, paths.tz_label_for_date(d)), "",
                 "사람 입력 카드 %d장 · 프로젝트 %d개 · 따로 묶음: 자동 실행 %d장 · 사람 입력 없음 %d장 · 전달 안 된 대기열 %d건" % (
                     len(groups["human"]), len(projs), len(groups["auto"]), len(groups["no_human"]), len(groups["ghost"]))]
 

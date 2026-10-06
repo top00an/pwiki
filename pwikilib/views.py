@@ -189,7 +189,7 @@ def day(con, date):
         by.setdefault(p, [])
     n_slash = sum(slash.values())
     n_local = sum(slash_local_counts(con, lo, hi).values())
-    out = ["# %s 작업 타임라인 (KST)" % date,
+    out = ["# %s 작업 타임라인 (%s)" % (date, paths.tz_label_for_date(date)),
            "사람 입력 %d건 = 카드 %d장 + 인자 없는 슬래시 명령 %d건(카드 아님) · 프로젝트 %d개" % (
                len(human) + n_slash, len(human), n_slash, len(by)),
            "따로 묶음: 자동 실행(claude -p) %d장 · 사람 입력 없음(팀원 세션 등) %d장 · 전달 안 된 대기열 %d건" % (
@@ -779,11 +779,11 @@ def resume(con, project, max_chars=4000, exclude=(), now=None):
     now = now or paths.now_utc_iso()
     sids = candidate_sessions(con, project, now, exclude)
     head = ["# 이어 하기: %s" % short_project(project),
-            "pwiki resume · 만든 시각 %s KST · 결정론 사실만(LLM 요약 없음)" % paths.kst_str(now)]
+            "pwiki resume · 만든 시각 %s · 결정론 사실만(LLM 요약 없음)" % paths.kst_str_z(now)]
     last, pend, more = pending_sessions(con, project, now, exclude)
     if pend:
-        head.append("마지막 수집(%s KST) 뒤 활동한 세션(그 활동은 아래에 없음, 원문 내용은 읽지 않음): %s%s" % (
-            paths.kst_str(last, "%H:%M"), ", ".join("%s %s" % (sid[:8], paths.kst_str(ts, "%H:%M")) for sid, ts in pend),
+        head.append("마지막 수집(%s) 뒤 활동한 세션(그 활동은 아래에 없음, 원문 내용은 읽지 않음): %s%s" % (
+            paths.kst_str_z(last, "%H:%M"), ", ".join("%s %s" % (sid[:8], paths.kst_str(ts, "%H:%M")) for sid, ts in pend),
             " 외 %d개" % more if more else ""))
     states = [_session_state(con, s) for s in sids]
     drop = set(exclude or ())
@@ -799,19 +799,19 @@ def resume(con, project, max_chars=4000, exclude=(), now=None):
     secs = [("마지막 세션(가장 최근 사람 입력 기준)", [
         "- 세션: %s" % top["sid"],
         "- 제목: %s" % (one_line(title, 100) if title else "(없음)"),
-        "- 기간: %s ~ %s KST · 카드 %d장" % (paths.kst_str(fts), paths.kst_str(max(lts or "", top["last_ts"] or "") or None),
+        "- 기간: %s ~ %s · 카드 %d장" % (paths.kst_str(fts), paths.kst_str_z(max(lts or "", top["last_ts"] or "") or None),
                                          ncards or 0),
         "- cwd: %s" % (cwd or "-"),
     ])]
     rq = top["req"]
-    secs.append(("마지막 사람 요청", ["- %s KST · [%s]" % (paths.kst_str(rq["ts"]), rq["key"])] + _quote(rq["text"], 500, 12)))
+    secs.append(("마지막 사람 요청", ["- %s · [%s]" % (paths.kst_str_z(rq["ts"]), rq["key"])] + _quote(rq["text"], 500, 12)))
     if top["ans"]:
         an = top["ans"]
-        secs.append(("마지막 답 앞부분", ["- %s KST · [%s]" % (paths.kst_str(an["ts"]), an["key"])] + _quote(an["text"], 500, 12)))
+        secs.append(("마지막 답 앞부분", ["- %s · [%s]" % (paths.kst_str_z(an["ts"]), an["key"])] + _quote(an["text"], 500, 12)))
     if top["compact"]:
         cl = _compact_lines(top["compact"])
         if cl:
-            secs.append(("마지막 압축 요약(%s KST)" % paths.kst_str(top["compact"]["ts"]), cl))
+            secs.append(("마지막 압축 요약(%s)" % paths.kst_str_z(top["compact"]["ts"]), cl))
     if others:
         lines = []
         for s in others:
@@ -830,14 +830,14 @@ def resume(con, project, max_chars=4000, exclude=(), now=None):
         todos = json.loads(tw[0] or "[]")
         open_items = [t for t in todos if (t or {}).get("status") != "completed"]
         if open_items:
-            lines = ["- 기준: %s KST 카드 [%s] · 전체 %d · 미완 %d" % (paths.kst_str(tw[1]), ev_ref(tw[2]), len(todos),
+            lines = ["- 기준: %s 카드 [%s] · 전체 %d · 미완 %d" % (paths.kst_str_z(tw[1]), ev_ref(tw[2]), len(todos),
                                                                  len(open_items))]
             lines += ["- [%s] %s" % (t.get("status"), one_line(t.get("content"), 120)) for t in open_items]
             secs.append(("미완 할 일(마지막 TodoWrite)", lines))
     ue = unresolved_error(con, top["sid"], now)
     if ue:
         secs.append(("해결 안 된 마지막 에러", [
-            "- %s KST · 도구 %s · sig:%s" % (paths.kst_str(ue["ts"]), ue["tool"] or "?", ue["sig"] or "-"),
+            "- %s · 도구 %s · sig:%s" % (paths.kst_str_z(ue["ts"]), ue["tool"] or "?", ue["sig"] or "-"),
             "- 대상: %s" % one_line(ue["cmd"] or ue["fpath"] or "-", 140),
             "- 첫 줄: %s" % one_line(ue["line"], 200),
             "- 판정 규칙: 뒤에 같은 도구·같은 대상(Bash 는 명령 앞 3낱말)의 성공이 이 세션에 없음"
@@ -1084,8 +1084,8 @@ def format_search(res, query):
             ref = "카드 " + ref[2:]
         elif ref.startswith("d:"):
             ref = "문서 " + ref[2:]
-        out.append("- [%s] %s · %s · %s KST · 일치 %s" % (r["kind"], ref, short_project(r["project"]),
-                                                       paths.kst_str(r["ts"]), r["method"]))
+        out.append("- [%s] %s · %s · %s · 일치 %s" % (r["kind"], ref, short_project(r["project"]),
+                                                       paths.kst_str_z(r["ts"]), r["method"]))
         out.append("  " + r["snippet"])
     return "\n".join(out)
 
@@ -1139,8 +1139,8 @@ def _show_card(con, key):
         return None
     sid, proj, t0, t1, dur, human, last, ntools, files, cmds, nerr, hk, dlv = r
     out = ["# 카드 %s" % key[2:],
-           "- 프로젝트 %s · 세션 %s · %s ~ %s KST · 소요 %s · 도구 %d · 에러 %d · %s" % (
-               short_project(proj), sid, paths.kst_str(t0), paths.kst_str(t1), fmt_dur(dur), ntools or 0, nerr or 0,
+           "- 프로젝트 %s · 세션 %s · %s ~ %s · 소요 %s · 도구 %d · 에러 %d · %s" % (
+               short_project(proj), sid, paths.kst_str(t0), paths.kst_str_z(t1), fmt_dur(dur), ntools or 0, nerr or 0,
                dict(BUNDLES).get(bundle_of(hk, dlv), "전달 안 된 대기열")),
            "", "## 사람 입력", human or "(없음)", "", "## 마지막 답", last or "(없음)"]
     for title, raw in (("파일", files), ("명령", cmds)):
@@ -1160,8 +1160,8 @@ def _show_event(con, key):
         return None
     kind, sub, ts, proj, sid, text, fkind = r
     return "\n".join(["# 행 %s" % key,
-                      "- 종류 %s%s · %s KST · 프로젝트 %s · 세션 %s · 원천 %s" % (
-                          kind, ("/" + sub) if sub else "", paths.kst_str(ts), short_project(proj), sid or "-",
+                      "- 종류 %s%s · %s · 프로젝트 %s · 세션 %s · 원천 %s" % (
+                          kind, ("/" + sub) if sub else "", paths.kst_str_z(ts), short_project(proj), sid or "-",
                           fkind or "-"),
                       "", text or "(본문 없음)"])
 
@@ -1170,5 +1170,5 @@ def _show_doc(con, rel):
     r = con.execute("SELECT kind, project, updated, text FROM docs WHERE path=?", (rel,)).fetchone()
     if not r:
         return None
-    return "\n".join(["# 문서 %s" % rel, "- 종류 %s · 프로젝트 %s · 갱신 %s KST" % (r[0], short_project(r[1]), paths.kst_str(r[2])),
+    return "\n".join(["# 문서 %s" % rel, "- 종류 %s · 프로젝트 %s · 갱신 %s" % (r[0], short_project(r[1]), paths.kst_str_z(r[2])),
                       "", r[3] or "(본문 없음)"])
