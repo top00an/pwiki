@@ -1,20 +1,22 @@
 #!/usr/bin/python3
-"""배포본 누출 검사. 값은 출력하지 않는다(종류·자리·개수만).
+"""Leak check for a distribution. Values are never printed (only kind, location and count).
 
-(가) 금지 목록(--denylist, 저장소 밖 파일. 한 줄에 낱말 하나, # 주석): 파일 내용·파일 이름·커밋 메시지·작성자 이름.
-     대소문자 무시 부분 일치. 걸린 낱말은 목록의 줄 번호(#n)로만 알린다.
-(나) 이 컴퓨터 사용자의 홈 경로·사용자 이름·전체 이름(실행할 때 읽는다. 저장소에 적지 않는다).
-(다) pwiki 알려진 값(secrets.local)·수확값(secrets.harvested): pwikilib.leakscan 대조기와 가림기의 known 계열로 센다.
-     값은 메모리에만 두고 개수만 낸다. PWIKI_HOME 으로 어느 목록을 읽을지 정한다.
-     알려진 값은 어디서 걸려도 실패다. 수확값은 pwiki 를 Claude Code 로 만들며 시험 파일의 가짜 값까지 수확했을 수 있어,
-     tests/ 안에서만 걸린 수확값은 '시험 가짜값 추정'으로 따로 세고 실패로 보지 않는다(--strict 면 실패. 사람이 확인한다).
-(라) 이메일(예시 도메인 제외)·사설 IP(10.0.0.0/24 예시 대역 제외)·토큰 모양(가짜로 보이는 모양 제외).
-(마) git 저장소면: 커밋 수(--single-commit 이면 1 이어야 한다), 작성자·커밋한 사람 이메일(--expect-email).
-(바) 이 컴퓨터의 Claude Code 프로젝트 폴더 이름(<기록 폴더>/projects, 실행할 때 읽는다): 홈·임시 폴더 앞부분과
-     번호·uuid 꼬리를 뗀 나머지가 12자 이상이면 대소문자 무시 부분 일치로 찾는다. 걸린 이름은 #n 으로만 알린다.
+(a) Denylist (--denylist, a file outside the repository; one word per line, # comments): file contents, file names, commit messages,
+    author names. Case-insensitive substring match. A matched word is reported only by its line number in the list (#n).
+(b) This computer's user home path, user name and full name (read at run time; never written into the repository).
+(c) pwiki known values (secrets.local) and harvested values (secrets.harvested): counted with the pwikilib.leakscan matcher and
+    the redactor's known family. Values stay in memory; only counts are output. PWIKI_HOME selects which lists are read.
+    A known value is a failure wherever it is found. Harvested values may include fake values from test files, harvested while
+    building pwiki with Claude Code, so harvested values found only inside tests/ are counted separately as '시험 가짜값 추정'
+    ("likely test fake value") and not treated as failures (with --strict they fail; a person checks them).
+(d) Emails (except example domains), private IPs (except the 10.0.0.0/24 example range), token shapes (except fake-looking shapes).
+(e) If it is a git repository: commit count (must be 1 with --single-commit), author and committer emails (--expect-email).
+(f) Claude Code project folder names on this computer (<history folder>/projects, read at run time): after stripping home and temp
+    folder prefixes and number or uuid tails, a remainder of 12+ chars is searched as a case-insensitive substring. A matched
+    name is reported only as #n.
 
-사용: leak_check_dist.py <폴더> [--denylist PATH] [--expect-email ADDR] [--expect-name NAME] [--single-commit]
-종료 코드: 0 깨끗, 1 걸림 또는 판정 못 함, 2 사용 오류.
+Usage: leak_check_dist.py <folder> [--denylist PATH] [--expect-email ADDR] [--expect-name NAME] [--single-commit]
+Exit codes: 0 clean, 1 hit or undecidable, 2 usage error.
 """
 import argparse
 import base64

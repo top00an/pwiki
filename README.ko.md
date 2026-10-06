@@ -111,7 +111,28 @@ pwiki 는 `CLAUDE.md` 를 쓰지 않고, 작업 폴더를 건드리지 않고, �
 
 - macOS(우선) 또는 리눅스
 - Python 3.9 이상, 표준 라이브러리만. 맥은 `/usr/bin/python3`(명령줄 도구)를 먼저 씁니다.
-- SQLite 3.34 이상, FTS5 trigram 지원. 설치기가 먼저 확인하고, 없으면 이유를 말하고 멈춥니다.
+- SQLite 3.34 이상, FTS5 trigram 지원. **SQLite 는 따로 설치하지 않습니다.** pwiki 는 파이썬에 들어 있는 SQLite 를 씁니다.
+
+설치기는 찾은 `python3` 를 하나씩 시험해 두 조건을 확인합니다. 맞는 것이 없으면 후보마다 이유를 알려 주고 멈추며, 이때는 아무것도 바꾸지 않습니다.
+
+<details>
+<summary><b>파이썬이나 SQLite 가 없거나 오래됐을 때</b></summary>
+
+지금 가진 것 확인:
+
+```sh
+python3 -c "import sys, sqlite3; print(sys.version.split()[0], sqlite3.sqlite_version)"
+```
+
+| 상황 | 해결 |
+|---|---|
+| 맥에 `python3` 가 없음 | `xcode-select --install` (명령줄 도구에 파이썬 3.9 와 새 SQLite 가 들어 있음) |
+| 리눅스에 `python3` 가 없음 | `sudo apt install python3` (Ubuntu 22.04 이상, Debian 12 이상이면 두 조건 모두 충족) |
+| SQLite 가 3.34 보다 오래됨 (예: Ubuntu 20.04) | 새 파이썬을 받습니다. 예: [uv](https://docs.astral.sh/uv/) 로 `uv python install 3.12` 후 `./install.sh --python "$(uv python find 3.12)"` |
+| 특정 파이썬을 쓰고 싶음 (Homebrew, pyenv) | `./install.sh --python /경로/python3` |
+| 윈도 | 직접은 지원하지 않습니다. WSL 에서 리눅스 방법을 따릅니다(시험 안 함) |
+
+</details>
 - Claude Code 기록 폴더(`~/.claude/projects`). 다른 곳이면 `PWIKI_CLAUDE_DIR` 로 줍니다.
 
 ## 시간대

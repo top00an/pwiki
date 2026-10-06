@@ -1,10 +1,11 @@
-"""Obsidian vault 내보내기(출력 전용). 원본은 SQLite 다.
+"""Obsidian vault export (output only). SQLite is the source of truth.
 
-- days/<YYYY-MM-DD>.md, projects/<프로젝트>.md, cards/<YYYY-MM-DD>/<카드파일>.md, index.md
-- 마지막 내보내기 해시와 파일 해시가 다르면(사람이 고침) 덮지 않고 충돌로 보고한다.
-- 전에 내보냈지만 이번에 만들지 않는 페이지(카드가 합쳐지거나 사라짐)는 사람이 고치지 않았을 때만 지운다(고쳤으면 충돌).
-- 사람 메모는 _notes/ 에 둔다. pwiki 는 _notes/ 를 읽지도 쓰지도 않는다(처음 한 번 안내 README 만 만든다).
-- 쓰기 전에 페이지 본문마다 가림 검사를 하고, 남은 비밀이 있으면 그 페이지는 쓰지 않는다.
+- days/<YYYY-MM-DD>.md, projects/<project>.md, cards/<YYYY-MM-DD>/<card file>.md, index.md
+- If a file's hash differs from the last export hash (a person edited it), it is not overwritten and is reported as a conflict.
+- Pages exported before but not produced this time (cards merged or gone) are deleted only if no person edited them
+  (otherwise a conflict).
+- Human notes live in _notes/. pwiki neither reads nor writes _notes/ (it only creates an intro README once, the first time).
+- Before writing, each page body is redaction-checked; a page with remaining secrets is not written.
 """
 import collections
 import hashlib

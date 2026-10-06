@@ -1,34 +1,36 @@
 #!/usr/bin/python3
-"""Claude Code settings.json 에 pwiki SessionStart 훅 하나를 덧붙이기만 한다(기존 항목은 그대로 둔다).
+"""Append a single pwiki SessionStart hook to Claude Code settings.json and nothing else (existing entries are left as they are).
 
-사용:
-  merge_settings.py                     미리보기(쓰지 않는다, 기본)
-  merge_settings.py --apply             실제로 덧붙인다
-  merge_settings.py --remove            덧붙인 pwiki 항목만 빼는 미리보기(되돌리기)
-  merge_settings.py --remove --apply    실제로 뺀다
-  --settings PATH   대상(기본 ~/.claude/settings.json, 심볼릭 링크면 실제 파일에 쓴다)
-  --command CMD     덧붙일(뺄) 훅 명령. 조각은 이 명령으로 만든다(matcher startup|clear, timeout 5)
-  --python PATH     --command 가 없을 때 명령을 만들 python(기본 /usr/bin/python3, 없으면 지금 python)
-  --pwiki-home DIR  --command 가 없을 때 명령 앞에 PWIKI_HOME 을 붙인다(기본 ~/.pwiki 이면 생략)
-  --snippet PATH    조각 JSON 파일(옛 방식). --command 와 함께 쓰지 않는다
-  --print-snippet   만든 조각 JSON 을 출력하고 끝낸다(settings 는 읽지 않는다)
-  --script PATH     --remove 에서만. 명령 글자가 달라도 이 훅 파일 경로를 인자로 가진 명령이면 함께 뺀다
-                    (설치 기록 없이 제거할 때, 또는 PWIKI_HOME·python 을 바꿔 설치했을 때)
-  명령을 주지 않으면 '<python> <이 폴더>/pwiki_session_start.py' 로 만든다.
+Usage:
+  merge_settings.py                     preview (writes nothing; default)
+  merge_settings.py --apply             actually append
+  merge_settings.py --remove            preview removing only the appended pwiki entry (undo)
+  merge_settings.py --remove --apply    actually remove
+  --settings PATH   target (default ~/.claude/settings.json; if it is a symlink, the real file is written)
+  --command CMD     hook command to append (or remove). The snippet is built from this command (matcher startup|clear, timeout 5)
+  --python PATH     python used to build the command when --command is absent (default /usr/bin/python3, else the current python)
+  --pwiki-home DIR  when --command is absent, prefix the command with PWIKI_HOME (omitted when it is the default ~/.pwiki)
+  --snippet PATH    snippet JSON file (old method). Not used together with --command
+  --print-snippet   print the built snippet JSON and exit (settings is not read)
+  --script PATH     --remove only. Also remove any command that has this hook file path as an argument, even if the command text differs
+                    (when removing without an install record, or after installing with a different PWIKI_HOME or python)
+  Without a command, it is built as '<python> <this folder>/pwiki_session_start.py'.
 
-순서:
-  1) 합치기 전 검증: 대상과 조각이 JSON 객체인가, 중복 키가 없는가, hooks 구조가 맞는가,
-     조각의 명령이 가리키는 파일이 있는가, 이미 들어 있지 않은가.
-  2) 메모리에서 합치고 검사: hooks.SessionStart 끝에 그룹 하나만 늘었는가, 그 밖의 모든 값(키 순서 포함)이 같은가,
-     직렬화한 글을 다시 읽으면 같은 객체인가.
-  3) 쓰기(--apply 일 때만): 같은 폴더의 임시 파일 → 원본 권한 → 바꾸기 직전에 원본이 그사이 바뀌지 않았는지 확인 → 원자적 바꾸기.
-  4) 쓴 뒤 검사: 디스크에서 다시 읽어 2)의 검사를 다시 한다. 실패하면 읽어 둔 원래 바이트로 되돌려 쓴다.
+Steps:
+  1) Pre-merge validation: are the target and the snippet JSON objects, are there no duplicate keys, is the hooks structure valid,
+     does the file referenced by the snippet's command exist, is it not already present.
+  2) Merge in memory and check: exactly one group added at the end of hooks.SessionStart, every other value (key order included) unchanged,
+     and the serialized text reads back as the same object.
+  3) Write (only with --apply): temp file in the same folder → original permissions → right before replacing, confirm the original
+     has not changed in the meantime → atomic replace.
+  4) Post-write check: read back from disk and repeat the checks of 2). On failure, write back the original bytes read earlier.
 
-출력에는 settings.json 의 값을 싣지 않는다(개수·이벤트 이름·판정만). 백업 사본을 만들지 않는다(되돌리기는 --remove).
-쓰기는 JSON 을 다시 직렬화한다. 원본이 json.dumps 모양(Claude Code 기본인 들여쓰기 2 등)이면 바이트까지 같게 쓰고,
-손으로 고친 모양이면 의미·키 순서만 같고 공백은 바뀐다. 빼기는 비게 된 hooks.SessionStart·hooks 를 함께 지운다.
-종료 코드: 0 통과(바꿨거나 이미 그 상태), 3 검증 실패(쓰지 않음), 4 그사이 다른 쓰기가 있었음(쓰지 않음),
-5 쓴 뒤 검사 실패(원래 바이트로 되돌림).
+Output never includes values from settings.json (only counts, event names and verdicts). No backup copy is made (undo is --remove).
+Writing re-serializes the JSON. If the original is in json.dumps form (e.g. indent 2, the Claude Code default) the bytes come out identical;
+if it was edited by hand, meaning and key order are kept but whitespace changes. Removal also deletes hooks.SessionStart and hooks
+if they become empty.
+Exit codes: 0 pass (changed, or already in that state), 3 validation failed (nothing written), 4 another write happened in the meantime
+(nothing written), 5 post-write check failed (original bytes restored).
 """
 import argparse
 import copy

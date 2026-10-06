@@ -1,4 +1,4 @@
-"""명령줄. 사용: pwiki <명령> [옵션]"""
+"""Command line. Usage: pwiki <command> [options]"""
 import argparse
 import json
 import sys

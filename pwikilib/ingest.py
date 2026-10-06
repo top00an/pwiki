@@ -1,11 +1,12 @@
-"""수집기. ~/.claude 아래 원천을 바이트 오프셋으로 이어 읽어 DB 에 적재한다. DB 에 쓰는 주체는 이것 하나다.
+"""Collector. Reads sources under ~/.claude incrementally by byte offset and loads them into the DB. It is the only writer to the DB.
 
-원천
-- 세션 기록 <프로젝트>/<세션>.jsonl, 서브에이전트 <세션>/subagents/**/agent-*.jsonl,
-  워크플로 저널 <세션>/subagents/workflows/*/journal.jsonl, ~/.claude/history.jsonl  (덧붙이기: 오프셋)
-- 메모리 md, 워크플로 스크립트·실행 기록 json, agent meta json, tool-results 파일      (해시 비교: 전체 재읽기)
+Sources
+- Session logs <project>/<session>.jsonl, subagents <session>/subagents/**/agent-*.jsonl,
+  workflow journals <session>/subagents/workflows/*/journal.jsonl, ~/.claude/history.jsonl  (append-only: offset)
+- Memory md, workflow scripts and run records json, agent meta json, tool-results files      (hash compare: full reread)
 
-멱등: 같은 원천을 다시 읽으면 새 행 0. 파일이 줄었거나 inode·앞부분 해시가 바뀌면 처음부터 읽고 키로 중복을 거른다.
+Idempotent: rereading the same source adds 0 rows. If a file shrank, or its inode or leading-bytes hash changed, it is read
+from the start and duplicates are filtered by key.
 """
 import collections
 import errno

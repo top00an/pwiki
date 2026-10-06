@@ -1,4 +1,4 @@
-"""경로 설정. 시험은 환경변수로 전부 바꿔 끼운다."""
+"""Path settings. Tests swap every one of them through environment variables."""
 import os
 import re
 import datetime

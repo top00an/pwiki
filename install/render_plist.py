@@ -1,10 +1,10 @@
 #!/usr/bin/python3
-"""launchd plist 템플릿(local.pwiki.collect.plist.in)의 @@…@@ 자리를 사용자 경로로 바꿔 쓴다.
+"""Fill the @@…@@ placeholders in the launchd plist template (local.pwiki.collect.plist.in) with the user's paths and write the result.
 
-사용:
+Usage:
   render_plist.py --python PY --repo DIR --pwiki-home DIR --claude-dir DIR --vault DIR [--out PATH]
-  --out 이 없으면 표준 출력으로 낸다. 값은 XML 로 이스케이프하고, 결과를 plistlib 로 다시 읽어 검사한다.
-종료 코드: 0 통과, 3 검사 실패(쓰지 않음).
+  Without --out, writes to stdout. Values are XML-escaped, and the result is read back with plistlib to check it.
+Exit codes: 0 pass, 3 check failed (nothing written).
 """
 import argparse
 import os

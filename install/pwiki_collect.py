@@ -1,21 +1,22 @@
 #!/usr/bin/python3
-"""launchd 가 주기마다 부르는 수집 감싸개(local.pwiki.collect).
+"""Collection wrapper that launchd calls periodically (local.pwiki.collect).
 
-하는 일: pwiki ingest --all 을 한 번 돌리고 결과를 기록한다.
-- 잠금: pwiki ingest 자신의 잠금(~/.pwiki/ingest.lock, flock)을 쓴다. 다른 수집이 돌고 있으면 ingest 가 75 로 끝나고,
-  여기서는 'busy' 로 적고 0 으로 끝낸다(실패가 아니다. 그 수집이 일을 한다). launchd 도 같은 잡을 겹쳐 띄우지 않는다.
-- 재시도: 실패해도 따로 다시 돌리지 않는다. launchd StartInterval 이 다음 회차에 다시 부른다(잠자는 동안 놓친 회차는 깨어난 뒤 한 번).
-- 시간 상한: PWIKI_COLLECT_TIMEOUT 초(기본 3300)가 지나면 프로세스 묶음에 SIGTERM, 30초 뒤 SIGKILL. 'timeout' 으로 적는다.
-  ingest 는 중간에 멈춰도 다음 실행이 이어 읽고 다시 가린다(트랜잭션 단위).
-- 기록(모두 ~/.pwiki/logs, 600):
-  collect.log          회차마다 JSON 한 줄(at·outcome·rc·elapsed_s·fails_in_row). 2MB 넘으면 collect.log.1 로 돌린다.
-  collect.last.txt     마지막 회차의 ingest 출력 전체(값은 가린 뒤의 숫자·경로만 나온다).
-  collect.status.json  마지막 회차 요약(메뉴바·점검용).
-  collect.launchd.log  launchd 의 표준 출력·오류(이 감싸개가 뜨기 전 실패만 남는다).
-- 종료 코드: ok·busy 는 0, mismatch(줄 수 대조 불일치)는 2, timeout 은 124, 그 밖은 ingest 의 코드(없으면 1).
+What it does: runs pwiki ingest --all once and records the result.
+- Locking: uses pwiki ingest's own lock (~/.pwiki/ingest.lock, flock). If another collection is running, ingest exits with 75;
+  this wrapper logs 'busy' and exits 0 (not a failure: the other run does the work). launchd also never overlaps the same job.
+- Retry: a failure is not retried here. launchd StartInterval calls again on the next round (rounds missed during sleep run once
+  after waking).
+- Time limit: after PWIKI_COLLECT_TIMEOUT seconds (default 3300), SIGTERM to the process group, SIGKILL 30 seconds later. Logged as 'timeout'.
+  If ingest stops midway, the next run resumes reading and redacts again (per transaction).
+- Records (all in ~/.pwiki/logs, mode 600):
+  collect.log          one JSON line per round (at, outcome, rc, elapsed_s, fails_in_row). Rotated to collect.log.1 past 2MB.
+  collect.last.txt     full ingest output of the last round (only post-redaction numbers and paths appear).
+  collect.status.json  summary of the last round (for the menu bar and checks).
+  collect.launchd.log  launchd stdout/stderr (only failures before this wrapper starts end up here).
+- Exit codes: ok and busy are 0, mismatch (line-count reconciliation mismatch) is 2, timeout is 124, anything else is ingest's code (1 if none).
 
-환경변수: PWIKI_HOME, PWIKI_CLAUDE_DIR(pwiki 가 읽음), PWIKI_BIN(pwiki 실행 파일, 기본 이 저장소의 pwiki),
-PWIKI_COLLECT_TIMEOUT(초).
+Environment: PWIKI_HOME, PWIKI_CLAUDE_DIR (read by pwiki), PWIKI_BIN (pwiki executable, default this repository's pwiki),
+PWIKI_COLLECT_TIMEOUT (seconds).
 """
 import json
 import os

@@ -1,19 +1,22 @@
-"""결정론 작업 카드. 사람 입력 하나마다 한 장이고, 다음 사람 입력 직전까지의 사실만 모은다. LLM 요약은 없다.
+"""Deterministic work cards. One card per human input, holding only facts up to just before the next human input. No LLM summaries.
 
-사람 입력(카드 시작)
-- type:user 사람 줄(origin human, promptSource typed·queued·suggestion_accepted), sdk 프롬프트(claude -p, 자동 실행 묶음),
-  '!' 셸 입력(<bash-input>), 인자가 있는 슬래시 명령. 인자 없는 슬래시 명령(/model 등)은 카드가 아니고 day 에서 따로 센다.
-- 작업 도중 입력: attachment/queued_command(commandMode=prompt, origin human)
-- 작업 도중 '/goal <글>': 사람 줄이 남지 않고 attachment/queued_command(origin auto-continuation, 글 'Goal set: <글>')로
-  전달된다(history.jsonl 은 같은 ms 에 '/goal <글>' 을 적는다). 이 첨부를 사람 입력 카드(human_kind=goal)로 본다.
-  한가할 때 친 '/goal <글>' 은 <command-name> 사람 줄(slash)로 남고 이 첨부가 없다(실측).
-- queue-operation enqueue: 같은 글(자리표시·태그 정규화 뒤)의 줄이 뒤에 있거나 2분 안 앞에 있으면 그쪽이 카드다.
-  짝이 없을 때만 따로 한 장(delivered=0, 뒤 사건을 끌어오지 않음, '전달 안 된 대기열').
-- 사람 입력이 오기 전의 일(팀원 세션의 team-lead 메시지, 다른 세션 메시지 등): '사람 입력 없음' 카드 한 장
-  (human_kind=no_human). 세션의 토큰·에러가 빠지지 않게 한다.
-토큰: message.id 하나는 세션 안에서 처음 나온 카드 하나에만 넣는다(줄마다 반복되는 usage 중 출력이 가장 큰 줄 기준).
-하위 에이전트·워크플로 토큰: agentId·runId 하나는 처음 띄운 카드 하나에만 넣는다(재개한 Workflow 호출은 연결만).
-카드 키: c:<sessionId>:<첫 사람 줄 uuid>. uuid 가 없으면 그 줄의 결정론 키를 쓴다.
+Human input (card start)
+- type:user human lines (origin human, promptSource typed, queued, suggestion_accepted), sdk prompts (claude -p, automated batches),
+  '!' shell input (<bash-input>), slash commands with arguments. Slash commands without arguments (/model etc.) are not cards;
+  day counts them separately.
+- Input during work: attachment/queued_command (commandMode=prompt, origin human)
+- '/goal <text>' during work: no human line is left; it arrives as attachment/queued_command (origin auto-continuation,
+  text 'Goal set: <text>') (history.jsonl records '/goal <text>' at the same ms). This attachment is treated as a human-input card
+  (human_kind=goal). '/goal <text>' typed while idle remains a <command-name> human line (slash) without this attachment (measured).
+- queue-operation enqueue: if a line with the same text (after placeholder and tag normalization) comes later, or within 2 minutes
+  earlier, that line is the card. Only when unpaired does it get a card of its own (delivered=0, pulls in no later events,
+  '전달 안 된 대기열', "undelivered queue").
+- Work before any human input (team-lead messages in a teammate session, messages from other sessions, etc.): one
+  '사람 입력 없음' ("no human input") card (human_kind=no_human). Keeps the session's tokens and errors from being dropped.
+Tokens: a message.id goes only into the first card of the session where it appears (of the usage repeated on each line,
+the line with the largest output is used).
+Subagent and workflow tokens: an agentId or runId goes only into the first card that launched it (a resumed Workflow call is only linked).
+Card key: c:<sessionId>:<uuid of first human line>. Without a uuid, that line's deterministic key is used.
 """
 import collections
 import json

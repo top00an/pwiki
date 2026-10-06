@@ -1,4 +1,4 @@
-"""보기: day·today·eff·resume·search. 모두 DB 를 읽기만 한다. 해석·추천 문장은 쓰지 않는다."""
+"""Views: day, today, eff, resume, search. All of them only read the DB. No interpreting or recommending sentences are written."""
 import collections
 import json
 import os

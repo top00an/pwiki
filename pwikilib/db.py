@@ -1,9 +1,9 @@
-"""SQLite 스키마. 시스템 SQLite 3.51 에 있는 기능만 쓴다(메뉴바 앱과 같은 판).
+"""SQLite schema. Uses only features present in system SQLite 3.51 (the same version as the menu bar app).
 
-키 규칙
-- 원문 줄: <sessionId>:<uuid>. uuid 없는 줄은 <sessionId>:o:<fid>:<바이트오프셋>:<줄 sha1 앞 8자>.
-- 파일 id(fid): ~/.claude 기준 상대 경로의 sha1 앞 12자(결정론, 자동증가 아님).
-- 작업 카드: c:<sessionId>:<첫 사람 줄 uuid>(uuid 없으면 그 줄의 결정론 키 뒷부분).
+Key rules
+- Raw line: <sessionId>:<uuid>. A line without uuid: <sessionId>:o:<fid>:<byte offset>:<first 8 chars of the line's sha1>.
+- File id (fid): first 12 chars of the sha1 of the path relative to ~/.claude (deterministic, not autoincrement).
+- Work card: c:<sessionId>:<uuid of first human line> (without uuid, the tail of that line's deterministic key).
 """
 import os
 import sqlite3

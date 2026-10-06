@@ -1,31 +1,33 @@
-"""pwiki 데이터 자리(PWIKI_HOME·vault)가 pwiki 것인지 가리고, pwiki 가 만든 것만 지운다.
+"""Decide whether a pwiki data location (PWIKI_HOME, vault) belongs to pwiki, and delete only what pwiki created.
 
-install.sh 와 uninstall.sh 가 부른다. 표준 라이브러리만 쓴다.
+Called by install.sh and uninstall.sh. Standard library only.
 
-표시 파일: PWIKI_HOME/.pwiki-home, vault/.pwiki-vault (install.sh 가 만든다)
+Marker files: PWIKI_HOME/.pwiki-home, vault/.pwiki-vault (created by install.sh)
 
-pwiki 자리로 보는 조건
-- 빈 자리: 없거나 숨김 아닌 항목이 없다.
-- 표시: 표시 파일이 있다.
-- 옛 설치(표시 파일 이전): PWIKI_HOME 에 pwiki DB(pwiki.db, 표 구성으로 확인)가 있다. 곁에 사람이 둔 항목은 남긴다
-  (설치는 섞지 않고 제거는 지우지 않는다).
-- DB 없는 자리(미리 둔 secrets.local 등): 숨김 아닌 항목이 모두 pwiki 가 만드는 이름이고, logs/ 안은 pwiki 로그
-  이름뿐이며 runs/ 는 비어 있다. pwiki.db 라는 이름의 파일이 pwiki DB 가 아니면 사람 폴더로 본다(빈 DB 는 이름으로 센다).
-  vault 는 export 기록(PWIKI_HOME/pwiki.db 의 exports)의 페이지가 하나 이상 기록된 내용 그대로 있다.
-  _notes 가 있다는 것만으로는 pwiki vault 로 보지 않는다.
-그 밖은 사람 폴더다. 설치는 멈추고, 지우기는 아무것도 지우지 않는다.
+When a location counts as pwiki's
+- Empty: missing, or has no non-hidden entries.
+- Marker: the marker file exists.
+- Old install (before marker files): PWIKI_HOME holds a pwiki DB (pwiki.db, confirmed by its table set). Entries a person put
+  alongside are left alone (install does not mix in, removal does not delete them).
+- No DB (e.g. a pre-placed secrets.local): every non-hidden entry has a name pwiki creates, logs/ holds only pwiki log
+  names, and runs/ is empty. A file named pwiki.db that is not a pwiki DB makes it a person's folder (an empty DB counts by name).
+  A vault has at least one page from the export records (exports in PWIKI_HOME/pwiki.db) exactly as recorded.
+  The presence of _notes alone does not make it a pwiki vault.
+Anything else is a person's folder. Install stops, and deletion deletes nothing.
 
-지우는 것(pwiki 가 만든 것만)
-- PWIKI_HOME: DB(-wal·-shm·-journal)·secrets.local·secrets.harvested·ingest.lock·install.json·표시 파일,
-  logs/ 의 pwiki 기록(ingest·install·collect·hook 로그). 그 뒤 빈 logs/·runs/·PWIKI_HOME 만 rmdir.
-- vault: export 기록에 있는 페이지(사람이 고친 페이지 포함), 처음 안내 그대로인 _notes/README.md, 표시 파일,
-  내보내기 중 남은 *.pwiki-tmp. 그 뒤 빈 폴더만 rmdir.
+What gets deleted (only what pwiki created)
+- PWIKI_HOME: DB (-wal, -shm, -journal), secrets.local, secrets.harvested, ingest.lock, install.json, marker file,
+  pwiki records in logs/ (ingest, install, collect, hook logs). Then only an empty logs/, runs/ and PWIKI_HOME are rmdir'ed.
+- vault: pages in the export records (including pages a person edited), _notes/README.md if still the original intro text,
+  marker file, *.pwiki-tmp left over from an export. Then only empty folders are rmdir'ed.
 
+Usage. main() prints everything after the Korean marker line below on bad arguments, so keep that marker as is.
 사용:
   pwiki_data.py check-install HOME_DIR VAULT_DIR
-      0 받음, 1 멈춤(이유 한 줄)
+      0 accept, 1 stop (one-line reason)
   pwiki_data.py purge HOME_DIR VAULT_DIR USER_HOME REPO CLAUDE_DIR [--apply] [--dry-run]
-      --apply 없으면 지울 것만 알린다(0 지울 것 있음, 3 없음). --apply 면 지우고 남은 항목 수를 알린다.
+      Without --apply, only reports what would be deleted (0 something to delete, 3 nothing). With --apply, deletes and reports
+      the number of entries left.
 """
 import hashlib
 import os

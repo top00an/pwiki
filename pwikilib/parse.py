@@ -1,7 +1,7 @@
-"""기록 한 줄의 분류·정제·추출. 파서는 이것 하나다.
+"""Classify, clean and extract one record line. This is the only parser.
 
-순서: json.loads → 정제(지식 아닌 큰 필드를 자리표시로) → 가림(전체 문자열) → 추출(본문·도구·에러·토큰).
-정제는 값을 지우기만 하므로 가림보다 앞에 둬도 새는 것이 없다. 절단(FTS 상한)은 가림 뒤에만 한다.
+Order: json.loads → clean (large non-knowledge fields to placeholders) → redact (all strings) → extract (body, tools, errors, tokens).
+Cleaning only deletes values, so running it before redaction leaks nothing. Truncation (FTS cap) happens only after redaction.
 """
 import hashlib
 import json

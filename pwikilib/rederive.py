@@ -1,22 +1,27 @@
-"""저장된 행에 지금 규칙(가림·분류·카드)을 다시 적용한다. 원천 파일을 다시 읽지 않는다(원천은 30일 정리로 지워진다).
+"""Reapply the current rules (redaction, classification, cards) to stored rows. Source files are not reread (sources are deleted by
+the 30-day cleanup).
 
-쓰임
-- pwiki rederive            미리보기. DB 를 읽기 전용(mode=ro)으로 열고 쓰지 않는다. 바뀔 행 수·가림 종류·카드 증감·
-                            바뀌는 행 안의 알려진 값 독립 대조(전 → 후)를 보인다.
-- pwiki rederive --apply    적용. 수집 잠금 아래 한 트랜잭션으로 고친다. 백업 사본은 만들지 않는다(적용 전 내용은
-                            가림이 덜 된 사본이 되기 때문이다). 트랜잭션이라 중간에 실패하면 그대로 되돌아간다.
-- 소급 가림(수집이 부른다)  새로 수확한 값·바뀐 secrets.local 값의 닻(영숫자 연속)이나 새 약한 값 해시 앞자리가 든
-                            저장 행만 골라 같은 처리를 한다. 늦게 수확된 값이 앞서 저장한 행·FTS·카드에 남지 않게 한다.
-- 저장 행 수확             미리보기·적용과, 규칙 판이 바뀐 뒤 첫 수집이 먼저 한다. 저장 행(events.raw, docs)에서 지금
-                            규칙으로 수확해 목록에 올리고 같은 실행에서 그 값으로 가린다. 옛 규칙이 문맥으로 못 잡던 값은
-                            수확되지 않아 문맥 없는 사본이 남는데, 원천은 30일 뒤 지워지므로 저장 행이 유일한 회수 경로다.
+Modes
+- pwiki rederive            Preview. Opens the DB read-only (mode=ro) and writes nothing. Shows the number of rows that would change,
+                            redaction kinds, card count changes, and an independent before → after check of known values in the
+                            changed rows.
+- pwiki rederive --apply    Apply. Fixes everything in one transaction under the ingest lock. No backup copy is made (the content
+                            before applying would be a less-redacted copy). Being a transaction, a failure midway rolls back cleanly.
+- Retroactive redaction     (called by ingest) Applies the same processing only to stored rows that contain an anchor (alphanumeric
+                            run) of a newly harvested value or a changed secrets.local value, or the prefix of a new weak-value hash.
+                            Keeps late-harvested values out of rows, FTS and cards stored earlier.
+- Stored-row harvest        Done first by preview and apply, and by the first ingest after the rule version changes. Harvests from
+                            stored rows (events.raw, docs) with the current rules, adds the values to the list and redacts with them
+                            in the same run. Values the old rules missed for lack of context were never harvested, leaving
+                            context-free copies; sources are deleted after 30 days, so stored rows are the only recovery path.
 
-행마다 하는 일
-- events: raw(가림·정제 뒤 객체)를 지금 Redactor 로 다시 가리고 classify·extract 로 kind·글·도구 입력·에러 줄·압축 절·
-  FTS 본문을 다시 뽑는다. 달라진 행만 고친다(가림은 멱등: 이미 토큰인 자리는 다시 잡지 않는다).
-- docs: 글은 글로, meta 는 JSON 을 풀어 다시 가리고 FTS 본문을 다시 넣는다.
-- cards·sessions: 바뀐 세션의 카드를 다시 만든다. 전체 적용은 모든 세션을 다시 만든다(카드 규칙이 바뀐 것도 반영).
-값은 출력하지 않는다(개수와 키만).
+Per row
+- events: re-redacts raw (the object after redaction and cleaning) with the current Redactor, and re-extracts kind, text, tool input,
+  error lines, compaction sections and FTS body via classify and extract. Only changed rows are updated (redaction is idempotent:
+  spots that are already tokens are not caught again).
+- docs: text as text, meta decoded from JSON and re-redacted; the FTS body is reinserted.
+- cards, sessions: cards of changed sessions are rebuilt. A full apply rebuilds every session (picking up card-rule changes too).
+Values are never printed (only counts and keys).
 """
 import collections
 import json

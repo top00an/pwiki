@@ -1,18 +1,21 @@
-"""가림(redact). 저장·FTS·md 내보내기보다 먼저, JSON 을 푼 문자열에 적용한다.
+"""Redaction. Applied to JSON-decoded strings before storage, FTS and md export.
 
-1단(값): 알려진 값을 치환한다. 알려진 값 = secrets.local(사람이 넣은 값) + 수확값(수집 중 비밀번호 문맥에서 잡은 값).
-  - 값 전체: 이스케이프·URL 인코딩·HTML 엔티티·줄 분할 변형 포함.
-  - 값의 긴 조각: 길이 max(8, ceil(0.7×길이)) 이상이고 숫자·특수문자가 하나 이상 든 연속 부분 문자열
-    (원천에서 끝 글자가 빠진 채 적힌 값, 영숫자 핵심만 따로 쓴 값). 글자만으로 된 조각(계정 이름)은 치환하지 않는다.
-  - 값의 해시: sha256·sha1·md5(값, 값+개행) 16진 앞 6자 이상이 단독 토큰으로 나오면 치환한다.
-2단(형태): 정규식(DSN user:pass@, mysql -p, sshpass -p, curl -u, PASSWORD=·*_PW=·*PASS= 류, IDENTIFIED BY, Bearer,
-  sk-ant-, gh*_, AKIA, xox*-, AIza, apikey_<16진>, PRIVATE KEY, JWT, 휴대전화, 이메일). 사설 IP 는 가리지 않는다(작업 지식).
-  앞 경계는 다시 직렬화된 JSON 의 \\n·\\t·\\r 바로 뒤도 경계로 본다.
+Stage 1 (values): replaces known values. Known values = secrets.local (entered by a person) + harvested values (caught in password
+contexts during collection).
+  - Whole value: escape, URL-encoding, HTML-entity and line-split variants included.
+  - Long fragments of a value: contiguous substrings of length max(8, ceil(0.7×length)) or more that contain at least one digit or
+    special character (values written in the source with the last characters missing, or only the alphanumeric core written
+    separately). Letter-only fragments (account names) are not replaced.
+  - Value hashes: when the first 6+ hex chars of sha256, sha1 or md5 (of value, value+newline) appear as a standalone token, they are replaced.
+Stage 2 (shapes): regexes (DSN user:pass@, mysql -p, sshpass -p, curl -u, PASSWORD=, *_PW=, *PASS= family, IDENTIFIED BY, Bearer,
+  sk-ant-, gh*_, AKIA, xox*-, AIza, apikey_<hex>, PRIVATE KEY, JWT, mobile phone, email). Private IPs are not redacted
+  (working knowledge). The leading boundary also treats the position right after \\n, \\t, \\r of re-serialized JSON as a boundary.
 
-수확: 2단 규칙 중 값 그룹이 있는 규칙(비밀번호·토큰 문맥)이 잡은 값을 모은다. 강한 값은 1단 값 목록에 평문으로 올리고
-(다른 문맥에 같은 값이 나와도 치환), 약한 값(흔한 단어일 수 있음)은 해시만 올린다. 값은 ~/.pwiki/secrets.harvested(600)에만 둔다.
+Harvest: collects values caught by stage-2 rules that have a value group (password and token contexts). Strong values go into the
+stage-1 value list as plaintext (replaced even when the same value appears in another context); weak values (may be common words)
+are added as hashes only. Values live only in ~/.pwiki/secrets.harvested (600).
 
-알려진 값은 코드·로그·md 에 쓰지 않는다. 검사기는 개수만 센다.
+Known values are never written to code, logs or md. Checkers count only.
 """
 import hashlib
 import math

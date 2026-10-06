@@ -1,16 +1,18 @@
 #!/usr/bin/python3
-"""합성 Claude Code 기록 생성기(시험·시연용). 실제 기록은 읽지도 복사하지도 않는다.
+"""Synthetic Claude Code history generator (for tests and demos). Never reads or copies real history.
 
-만드는 것(--claude-dir 아래):
-  projects/<프로젝트>/<세션>.jsonl      사람 입력·답·도구 호출과 결과·압축 요약·/clear·하위 에이전트·워크플로 호출
-  projects/<프로젝트>/<세션>/subagents/   하위 에이전트 기록과 meta, 워크플로 저널·에이전트 기록
-  projects/<프로젝트>/<세션>/workflows/   워크플로 실행 기록(wf_*.json)
-  projects/<프로젝트>/memory/*.md        메모리 문서
-  history.jsonl                         사람 프롬프트 기록
-가짜 비밀값(비밀번호 문맥·토큰 모양)을 몇 개 넣는다. 값은 씨앗으로 만든 난수라 소스에 리터럴로 없다.
---secrets-out 을 주면 가짜 값 목록을 JSON 으로 쓴다(시험이 가림을 확인하는 데 쓴다).
+What it creates (under --claude-dir):
+  projects/<project>/<session>.jsonl        human input, answers, tool calls and results, compaction summary, /clear, subagents,
+                                            workflow calls
+  projects/<project>/<session>/subagents/   subagent logs and meta, workflow journals and agent logs
+  projects/<project>/<session>/workflows/   workflow run records (wf_*.json)
+  projects/<project>/memory/*.md            memory documents
+  history.jsonl                             human prompt history
+Inserts a few fake secret values (password contexts, token shapes). The values are seeded random strings, so they never appear
+as literals in the source.
+With --secrets-out, writes the list of fake values as JSON (tests use it to verify redaction).
 
-사용: make_fixture.py --claude-dir DIR [--date YYYY-MM-DD(KST, 기본 오늘)] [--cwd-root DIR] [--seed N]
+Usage: make_fixture.py --claude-dir DIR [--date YYYY-MM-DD (KST, default today)] [--cwd-root DIR] [--seed N]
       [--secrets-out PATH]
 """
 import argparse

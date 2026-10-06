@@ -1,19 +1,19 @@
 #!/usr/bin/python3
-"""Claude Code 스킬(~/.claude/skills/pwiki/SKILL.md) 설치·제거. 이 저장소가 쓴 스킬만 바꾸고 지운다.
+"""Install or remove the Claude Code skill (~/.claude/skills/pwiki/SKILL.md). Only changes or deletes a skill this repository wrote.
 
-설치: install/skill/SKILL.md.in 의 @CMD@(이 설치의 python 과 pwiki 경로)·@MARK@ 를 채워 <dir>/SKILL.md 로 쓴다(644).
-  - 같은 내용이면 그대로 둔다.
-  - 이미 있는 SKILL.md(끊긴 링크 포함)가 pwiki 표시 줄이 없는 사람 파일이면 쓰지 않고 멈춘다(rc 3).
-  - 다른 자리에 설치한 pwiki 의 스킬이면 쓰지 않고 멈춘다(rc 3). 그 자리에서 제거한 뒤 다시 돌린다.
-  - 경로에 스킬 설정 문법을 깨는 글자(줄바꿈 , ( ) " # : -->)가 있으면 설치하지 않는다(rc 3).
-  - 쓰기는 같은 폴더에 무작위 이름 임시 파일을 새로 만들어(O_EXCL) 쓴 뒤 바꿔 넣는다. 미리 둔 링크를 따라가지 않는다.
-제거: 표시 줄의 repo 가 이 저장소일 때만 SKILL.md 를 지우고, 폴더가 비면 폴더도 지운다.
+Install: fills @CMD@ (this install's python and pwiki path) and @MARK@ in install/skill/SKILL.md.in and writes <dir>/SKILL.md (644).
+  - If the content is identical, leaves it alone.
+  - If an existing SKILL.md (broken link included) is a person's file without the pwiki marker line, does not write and stops (rc 3).
+  - If it is the skill of a pwiki installed elsewhere, does not write and stops (rc 3). Remove it from there, then run again.
+  - If a path contains characters that break skill config syntax (newline , ( ) " # : -->), does not install (rc 3).
+  - Writes a new randomly named temp file in the same folder (O_EXCL), then replaces. Pre-placed links are not followed.
+Remove: deletes SKILL.md only when the marker line's repo is this repository, and deletes the folder too if it becomes empty.
 
-표시 줄: <!-- pwiki-skill repo="<JSON 문자열>" written by pwiki install.sh; ./uninstall.sh removes it -->
-(예전 형식 <!-- pwiki-skill repo=<경로> (written ...) --> 도 읽는다.)
+Marker line: <!-- pwiki-skill repo="<JSON string>" written by pwiki install.sh; ./uninstall.sh removes it -->
+(The old form <!-- pwiki-skill repo=<path> (written ...) --> is also read.)
 
-사용: skill.py install|remove --dir DIR --repo REPO [--python PY] [--dry-run]
-종료 코드: 0 바꿈 또는 그대로, 3 남의 파일이거나 쓸 수 없는 경로라 건드리지 않음, 2 사용 오류.
+Usage: skill.py install|remove --dir DIR --repo REPO [--python PY] [--dry-run]
+Exit codes: 0 changed or unchanged, 3 left untouched because the file belongs to someone else or the path cannot be written, 2 usage error.
 """
 import argparse
 import json

@@ -1,4 +1,4 @@
-"""검사: redact-check(남은 비밀 개수만), verify(원문 줄 수 대조, history 대조)."""
+"""Checks: redact-check (only the count of remaining secrets), verify (raw line-count reconciliation, history reconciliation)."""
 import collections
 import glob
 import json

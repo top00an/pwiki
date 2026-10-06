@@ -111,7 +111,28 @@ pwiki never writes `CLAUDE.md`, never touches your project folders, and never op
 
 - macOS (primary) or Linux
 - Python 3.9+, standard library only. On macOS, `/usr/bin/python3` (Command Line Tools) is preferred.
-- SQLite 3.34+ with FTS5 trigram support. The installer checks this first and stops with a reason if it is missing.
+- SQLite 3.34+ with FTS5 trigram support. **You do not install SQLite separately**: pwiki uses the SQLite built into Python.
+
+The installer tries every `python3` it finds, checks both, and if none fits it stops and prints the reason for each one. Nothing is changed at that point.
+
+<details>
+<summary><b>If Python or SQLite is missing or too old</b></summary>
+
+Check what you have:
+
+```sh
+python3 -c "import sys, sqlite3; print(sys.version.split()[0], sqlite3.sqlite_version)"
+```
+
+| Situation | Fix |
+|---|---|
+| macOS, no `python3` | `xcode-select --install` (Command Line Tools ship Python 3.9 with a recent SQLite) |
+| Linux, no `python3` | `sudo apt install python3` (Ubuntu 22.04+ and Debian 12+ meet both requirements) |
+| SQLite older than 3.34 (for example Ubuntu 20.04) | Get a newer Python, for example with [uv](https://docs.astral.sh/uv/): `uv python install 3.12`, then `./install.sh --python "$(uv python find 3.12)"` |
+| You want a specific Python (Homebrew, pyenv) | `./install.sh --python /path/to/python3` |
+| Windows | Not supported directly. Under WSL, follow the Linux steps (untested) |
+
+</details>
 - A Claude Code history folder (`~/.claude/projects`). Point `PWIKI_CLAUDE_DIR` elsewhere if needed.
 
 ## Time zone

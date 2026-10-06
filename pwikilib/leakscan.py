@@ -1,15 +1,18 @@
-"""독립 유출 검사. 가림 규칙(redact.PATTERNS)을 쓰지 않는다.
+"""Independent leak check. Does not use the redaction rules (redact.PATTERNS).
 
-원천 기록(~/.claude 의 줄 파일과 문서)에서 비밀번호·토큰 문맥의 값을 이 모듈만의 규칙으로 뽑고(값은 메모리에만 둔다),
-그 값이 출력(DB 파일 바이트·WAL·vault md·로그)에 몇 번 남았는지 센다. 값은 돌려주지 않고 규칙별 개수와 모양(마스크)만 돌려준다.
+Extracts values in password and token contexts from source records (line files and documents in ~/.claude) with this module's
+own rules (values stay in memory only), and counts how many times each value remains in outputs (DB file bytes, WAL, vault md, logs).
+Returns no values, only per-rule counts and shapes (masks).
 
-독립성
-- 문맥 규칙을 따로 썼다(줄 원문을 JSON 을 풀지 않고 훑는다. 이스케이프된 따옴표 \\" 를 문맥으로 받는다).
-- 값 조건도 따로 둔다: 길이 8 이상, 글자가 있고 숫자나 기호가 있으며, 변수·경로·코드식·상수명이 아닌 것.
-  가림의 '강한 값' 조건(글자+숫자, 또는 3종 이상)보다 넓다. 예: 글자+기호만 있는 값도 센다.
-- 인코딩 변형은 가림처럼 모양 목록(정규식 갈래)으로 받지 않고, 글을 풀어(normalize) 대조한다:
-  \\uXXXX, URL %XX, HTML 엔티티(숫자·이름), 기호 앞 역슬래시를 겹이 없어질 때까지 푼다. 그래서 가림의 모양 목록에 없는
-  겹친 인코딩(두 번 URL 인코딩, &amp; 앞머리 등)도 센다. 알려진 값(secrets.local)도 여기서 같이 센다.
+Independence
+- Context rules are written separately (raw lines are scanned without decoding JSON; escaped quotes \\" count as context).
+- Value conditions are separate too: length 8 or more, has letters plus digits or symbols, and is not a variable, path,
+  code expression or constant name. Broader than redaction's 'strong value' condition (letters+digits, or 3+ character classes).
+  E.g. values with only letters+symbols are counted too.
+- Encoding variants are not matched through a shape list (regex alternatives) as redaction does; the text is decoded (normalize)
+  and compared: \\uXXXX, URL %XX, HTML entities (numeric and named), and backslashes before symbols are decoded until no layers
+  remain. So layered encodings missing from redaction's shape list (double URL encoding, &amp; prefixes, etc.) are counted too.
+  Known values (secrets.local) are counted here as well.
 """
 import collections
 import html

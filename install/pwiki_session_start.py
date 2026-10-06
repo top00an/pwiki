@@ -1,21 +1,23 @@
 #!/usr/bin/python3
-"""pwiki 이어 하기 SessionStart 훅.
+"""pwiki resume SessionStart hook.
 
-Claude Code 가 새 세션을 열 때(startup·clear) 부른다. 표준 입력의 cwd 로 pwiki 프로젝트를 찾고,
-그 프로젝트의 resume 결과(4,000자 안)를 additionalContext 로 내보낸다.
+Called by Claude Code when it opens a new session (startup, clear). Finds the pwiki project from the cwd on stdin
+and emits that project's resume result (within 4,000 characters) as additionalContext.
 
-지키는 것:
-- 세션을 막지 않는다. 어떤 실패에도 종료 코드는 0 이고, 실패하면 아무것도 출력하지 않는다.
-- 마감(기본 1.8초)이 지나면 그 자리에서 0 으로 끝낸다. 출력 도중에는 끊지 않는다.
-- DB 는 읽기만 한다(mode=ro, -wal 이 없으면 쓰기 가능 연결 + query_only). DB 가 없으면 만들지 않는다.
-- 로그는 ~/.pwiki/logs/hook.log 에 한 줄(결과 종류·시간·글자 수). 본문과 오류 문구는 적지 않는다.
+Guarantees:
+- Never blocks the session. The exit code is 0 on any failure, and on failure nothing is printed.
+- Once the deadline (default 1.8 s) passes, exits 0 on the spot. Output already in progress is not cut off.
+- The DB is only read (mode=ro; if -wal is missing, a writable connection + query_only). A missing DB is not created.
+- Logs one line to ~/.pwiki/logs/hook.log (outcome kind, time, character count). Body text and error messages are not logged.
 
-- 마지막 요청·답·압축 요약은 DB(수집 때 가린 값)에서만 낸다. 세션 원문 jsonl 은 열지 않는다.
-  마지막 수집 뒤 바뀐 세션은 원문 파일 이름(세션 ID)과 수정 시각(stat)만 보고 한 줄로 알린다.
-- 새 세션 자신(session_id)은 뺀다. source=clear 여도 다른 세션은 빼지 않는다(지운 세션을 원문 없이 가려낼 수 없다).
+- The last request, answer and compaction summary come only from the DB (values redacted at collection). Raw session jsonl
+  is never opened. Sessions changed since the last collection are reported in one line using only the raw file name (session ID)
+  and modification time (stat).
+- The new session itself (session_id) is excluded. Even with source=clear, other sessions are not excluded (a cleared session
+  cannot be told apart without the raw file).
 
-환경변수: PWIKI_HOME(DB 위치), PWIKI_HOOK_DEADLINE(초, (0, 5] 로 자름), PWIKI_HOOK_LOG(로그 파일 경로, '-' 면 끔),
-PWIKI_EXTRACT(있으면 건너뜀, pwiki 자신의 claude -p 용).
+Environment: PWIKI_HOME (DB location), PWIKI_HOOK_DEADLINE (seconds, clamped to (0, 5]), PWIKI_HOOK_LOG (log file path, '-' disables),
+PWIKI_EXTRACT (if set, skip; for pwiki's own claude -p).
 """
 import json
 import os
