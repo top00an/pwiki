@@ -128,5 +128,27 @@ class TestRedactEndToEnd(unittest.TestCase):
         con.close()
 
 
+class TestLiteralValue(unittest.TestCase):
+    def test_curl_u_uid_gid_with_trailing_punctuation(self):
+        from pwikilib import leakscan
+        for v in ("1000", "1000.", "1000,", "1000)"):
+            self.assertFalse(leakscan.literal_value(v, "curl_u"), v)
+        # 숫자 뒤에 글자가 이어지면 여전히 값으로 센다
+        self.assertTrue(leakscan.literal_value("1000.x9Zk", "curl_u"))
+        self.assertTrue(leakscan.literal_value("s3cretPw.", "curl_u"))
+
+    def test_middle_dot_list_is_not_a_value(self):
+        from pwikilib import leakscan
+        found = {}
+        leakscan._scan_rules("# names: *password·*pwd(PGPASSWORD\u00b7dbPassword\u00b7MYSQL_PWD)", found)
+        self.assertFalse([v for v in found if v.startswith("\u00b7")], found)
+        self.assertFalse(leakscan.literal_value("\u00b7dbPassword", "kv"))
+        self.assertFalse(leakscan.keep_value("\u00b7dbPassword9"))
+        # 진짜 값은 그대로 잡는다
+        found = {}
+        leakscan._scan_rules("PGPASSWORD=Zq7xR2mK9vLp", found)
+        self.assertIn("Zq7xR2mK9vLp", found)
+
+
 if __name__ == "__main__":
     unittest.main()

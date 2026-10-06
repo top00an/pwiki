@@ -107,7 +107,8 @@ def keep_value(v):
     문맥 자리에 남았는지는 형태 검사(ShapeCounter)가 판정한다."""
     if not v or len(v) < 8 or len(v) > 128:
         return False
-    if v[0] in "$%{<([/~.`-*" or "REDAC" in v or "redac" in v:
+    # '·' 로 시작하면 낱말 목록의 구분점이다(주석 'PGPASSWORD·dbPassword·MYSQL_PWD' 의 다음 이름을 값으로 읽던 오탐)
+    if v[0] in "$%{<([/~.`-*\u00b7" or "REDAC" in v or "redac" in v:
         return False
     if re.search(r"[(){}\[\]/:\\=]|\?\.", v) or re.search(r"^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_]", v):
         return False
@@ -369,9 +370,9 @@ NOT_VALUES = {"true", "false", "null", "none", "nil", "str", "string", "int", "b
 def literal_value(v, rule=None):
     if not v or v.startswith("[REDAC") or v.startswith("[redac"):
         return False
-    if rule == "curl_u" and v.isdigit():
-        return False  # -u 1000:1000 은 uid:gid
-    if v[0] in "$%{<([/~.`*-\u2026" or v.lower() in NOT_VALUES:
+    if rule == "curl_u" and v.rstrip(".,;:)").isdigit():
+        return False  # -u 1000:1000 은 uid:gid(문장 끝 '1000:1000.' 처럼 문장부호가 붙어도 같다)
+    if v[0] in "$%{<([/~.`*-\u2026\u00b7" or v.lower() in NOT_VALUES:
         return False  # '…' 로 시작하면 출력이 자르며 붙인 표시(…(잘림))다. 값이 잘려 나간 자리이지 값이 아니다
     if re.match(r"^(?:os|self|env|process|config|settings|args|req|request|opts|options|cfg|conf|params)\.", v):
         return False

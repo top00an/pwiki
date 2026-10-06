@@ -254,7 +254,7 @@ Claude Code 가 새 세션을 열 때(`startup`, `/clear`) `install/pwiki_sessio
 - **iCloud Drive·Dropbox·OneDrive·Google Drive 같은 클라우드 동기화 폴더 안에 두지 않습니다.** vault 를 Obsidian Sync 로 올리지 않습니다.
 - `~/.pwiki` 는 권한 700, 비밀값 파일은 600 으로 둡니다.
 
-## 가림은 최선 노력입니다
+## 가림이 모든 비밀값을 잡지는 못합니다
 
 가림은 규칙(비밀번호·토큰 문맥, 알려진 토큰 모양, DSN, 이메일·전화번호 등)과 수확(비밀번호 문맥에서 본 값을 기억해 다른 자리에서도 가림)으로 합니다. 문맥 없이 혼자 나온 값은 놓칠 수 있습니다. 아는 비밀값은 직접 적어 둡니다.
 
