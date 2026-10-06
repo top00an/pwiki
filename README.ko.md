@@ -2,9 +2,9 @@
 
 # pwiki
 
-**Claude Code 기록을 남기고, 가리고, 이어 줍니다. 내 컴퓨터 안에서, LLM 없이.**
+**Claude Code 기록을 보존하고, 비밀값은 마스킹하고, 작업을 이어 줍니다. 내 컴퓨터 안에서, LLM 없이.**
 
-30일 자동 삭제 뒤에도 보존 · 저장 전에 비밀값 가림 · `/clear` 뒤에도 맥락 복원
+30일 자동 삭제 뒤에도 보존 · 저장 전에 비밀값 마스킹 · `/clear` 뒤에도 맥락 복원
 
 ![Python](https://img.shields.io/badge/python-3.9%2B-3776AB?logo=python&logoColor=white)
 ![Dependencies](https://img.shields.io/badge/dependencies-standard%20library%20only-2f6fde)
@@ -20,10 +20,10 @@
 ---
 
 Claude Code 는 **30일이 지난 세션 기록을 영구 삭제합니다**(`cleanupPeriodDays`). 몇 주 전에 한 일을 찾으려면 JSONL 원문을 뒤져야 합니다.
-pwiki 는 기록이 지워지기 전에 내 컴퓨터 안의 SQLite DB 하나로 옮기고, 저장하면서 비밀값을 가리고, 새 세션을 열 때 지난 세션의 요점을 Claude Code 에 돌려줍니다.
+pwiki 는 기록이 지워지기 전에 내 컴퓨터 안의 SQLite DB 하나로 옮기고, 저장하면서 비밀값을 마스킹하고, 새 세션을 열 때 지난 세션의 요점을 Claude Code 에 돌려줍니다.
 
 - **보존**: Claude Code 가 30일 뒤 지운 기록도 그대로 검색됩니다.
-- **가림**: 비밀번호·토큰 모양 값은 저장하기 전에 `[REDACTED:…]` 로 바뀝니다. [무엇을 가리는지](docs/REDACTION.ko.md)
+- **마스킹**: 비밀번호·토큰 모양 값은 저장하기 전에 `[REDACTED:…]` 로 바뀝니다. [무엇을 마스킹하는지](docs/REDACTION.ko.md)
 - **이어 하기**: `/clear` 뒤나 새 세션에서, SessionStart 훅이 마지막 요청·답·미완 할 일·그날 작업을 문맥으로 붙입니다.
 - **찾기**: 사람 입력 단위의 하루 타임라인과 모든 세션 전문 검색.
 
@@ -75,9 +75,9 @@ Claude 가 함께 설치되는 **스킬**로 알맞은 pwiki 명령을 골라 �
 
 ![이어 하기](docs/images/resume.png)
 
-**검색과 가림**: `pwiki search` 는 한국어 어간까지 다루는 전문 검색입니다. 결과의 키를 `pwiki show` 에 주면 전문이 열립니다. 비밀번호와 토큰은 저장할 때 이미 가려져 있습니다.
+**검색과 마스킹**: `pwiki search` 는 한국어 어간까지 다루는 전문 검색입니다. 결과의 키를 `pwiki show` 에 주면 전문이 열립니다. 비밀번호와 토큰은 저장할 때 이미 마스킹되어 있습니다.
 
-![검색과 비밀값 가림](docs/images/search-redaction.png)
+![검색과 비밀값 마스킹](docs/images/search-redaction.png)
 
 ## 빠른 시작
 
@@ -163,7 +163,7 @@ python3 -c "import sys, sqlite3; print(sys.version.split()[0], sqlite3.sqlite_ve
 | `pwiki ingest --all` | 새 기록 이어 읽기(자동 수집이 30분마다 돌립니다) |
 | `pwiki verify` | 원문 줄 수를 다시 세어 적재·제외와 맞는지 대조 |
 | `pwiki redact-check` | DB·WAL·검색 색인·vault·로그에 남은 비밀값 개수(값은 출력하지 않습니다) |
-| `pwiki rederive [--apply]` | 저장된 행에 지금 규칙(가림·분류·카드)을 다시 적용 |
+| `pwiki rederive [--apply]` | 저장된 행에 지금 규칙(마스킹·분류·카드)을 다시 적용 |
 | `pwiki eff` | 효율 지표(숫자만) |
 | `pwiki update [--check]` | 새 판을 받고 설치 때 고른 선택을 다시 반영합니다. `--check` 는 확인만 합니다 |
 
@@ -249,14 +249,14 @@ Claude Code 가 새 세션을 열 때(`startup`, `/clear`) `install/pwiki_sessio
 
 ## 데이터는 내 컴퓨터에만
 
-- DB(`~/.pwiki`)와 vault(`~/pwiki`)에는 내 작업 기록이 그대로 들어 있습니다(가림은 비밀값에만 합니다).
+- DB(`~/.pwiki`)와 vault(`~/pwiki`)에는 내 작업 기록이 그대로 들어 있습니다(마스킹은 비밀값에만 합니다).
 - **DB·vault 를 다른 사람과 공유하지 않습니다.** 저장소에 커밋하거나 메신저로 보내지 않습니다.
 - **iCloud Drive·Dropbox·OneDrive·Google Drive 같은 클라우드 동기화 폴더 안에 두지 않습니다.** vault 를 Obsidian Sync 로 올리지 않습니다.
 - `~/.pwiki` 는 권한 700, 비밀값 파일은 600 으로 둡니다.
 
-## 가림이 모든 비밀값을 잡지는 못합니다
+## 마스킹이 모든 비밀값을 잡지는 못합니다
 
-가림은 규칙(비밀번호·토큰 문맥, 알려진 토큰 모양, DSN, 이메일·전화번호 등)과 수확(비밀번호 문맥에서 본 값을 기억해 다른 자리에서도 가림)으로 합니다. 문맥 없이 혼자 나온 값은 놓칠 수 있습니다. 아는 비밀값은 직접 적어 둡니다.
+마스킹은 규칙(비밀번호·토큰 문맥, 알려진 토큰 모양, DSN, 이메일·전화번호 등)과 수확(비밀번호 문맥에서 본 값을 기억해 다른 자리에서도 마스킹)으로 합니다. 문맥 없이 혼자 나온 값은 놓칠 수 있습니다. 아는 비밀값은 직접 적어 둡니다.
 
 ```sh
 $EDITOR ~/.pwiki/secrets.local     # 한 줄에 값 하나, # 은 주석, 6자 미만은 무시
@@ -275,7 +275,7 @@ OpenAI Codex CLI 도 쓰고 있다면 pwiki 가 그 세션도 자동으로 수�
 Codex 세션은 `today`, `day`, `search`, `resume` 에 Claude Code 세션과 함께 나오고(`today`, `day`, `resume` 에는 `Codex` 표시가 붙습니다), 같은 작업 폴더에서 쓴 세션은 한 프로젝트로 묶입니다.
 
 - `~/.codex/sessions/**/rollout-*.jsonl` 과 `~/.codex/history.jsonl` 만 읽습니다. Codex 기록 폴더가 다른 곳에 있으면 `PWIKI_CODEX_DIR` 로 지정합니다.
-- 비밀값은 Claude Code 기록과 똑같이 가리고, `pwiki verify` 와 `pwiki redact-check` 도 Codex 파일까지 검사합니다.
+- 비밀값은 Claude Code 기록과 똑같이 마스킹하고, `pwiki verify` 와 `pwiki redact-check` 도 Codex 파일까지 검사합니다.
 - 이어 하기 훅은 아직 Claude Code 에서만 동작합니다.
 
 ## 업데이트
@@ -329,7 +329,7 @@ Claude Code 원래 기록(`~/.claude`)은 어떤 경우에도 지우지 않습�
 - **영어 출력 옵션**: 지금 출력 문구는 한국어입니다.
 - **다른 에이전트 CLI**(OpenCode, Copilot CLI): 수요가 있으면 검토합니다.
 
-제안과 버그 신고는 [CONTRIBUTING.md](CONTRIBUTING.md) 를 봐 주세요. 가림 누락이나 데이터 노출은 [SECURITY.md](SECURITY.md) 절차로 알려 주세요.
+제안과 버그 신고는 [CONTRIBUTING.md](CONTRIBUTING.md) 를 봐 주세요. 마스킹 누락이나 데이터 노출은 [SECURITY.md](SECURITY.md) 절차로 알려 주세요.
 
 ## 저장소 구성
 
@@ -338,7 +338,7 @@ pwiki                   명령줄 진입점
 pwikilib/
   ingest.py             수집(DB 에 쓰는 유일한 곳)
   parse.py              한 줄 분류·정제·추출
-  redact.py             비밀값 가림
+  redact.py             비밀값 마스킹
   codex.py              Codex CLI 줄을 Claude Code 줄 모양으로 옮김
   cards.py              작업 카드
   views.py              today·day·resume·search·eff (읽기 전용)
@@ -349,7 +349,7 @@ pwikilib/
 install/                설치 도우미, 수집기, 이어 하기 훅, Claude Code 스킬
 tools/                  합성 기록 생성기, 배포본 생성기, 배포본 누출 검사
 tests/                  합성 기록으로만 도는 시험
-docs/                   가림 안내, README 그림
+docs/                   마스킹 안내, README 그림
 SECURITY.md, CONTRIBUTING.md, LICENSE, NOTICE
 ```
 
