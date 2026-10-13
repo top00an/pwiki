@@ -90,10 +90,12 @@ jobs:
             --jq '.jobs[] | select(.conclusion == "failure") | [.id, .name, ([.steps[] | select(.conclusion == "failure") | .name] | join(", "))] | @tsv' |
           while IFS=$'\t' read -r id name steps; do
             printf '== job %s · failed step: %s\n' "$name" "${steps:-?}" >> "$out"
+            # curl, not gh api: newer gh refuses to print logs that contain terminal escape sequences.
             # A finished job's log can take a few seconds to become downloadable.
             log="$RUNNER_TEMP/job-$id.log"
             for _ in 1 2 3 4 5 6; do
-              gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$id/logs" > "$log" 2> "$log.err" && [ -s "$log" ] && break
+              curl -sSfL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+                "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/jobs/$id/logs" -o "$log" 2> "$log.err" && [ -s "$log" ] && break
               sleep 10
             done
             if [ -s "$log" ]; then
