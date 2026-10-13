@@ -57,6 +57,41 @@ class NotesTest(unittest.TestCase):
         self.assertIsNone(err)
 
 
+LOG = """2026-10-13T05:06:38.5467220Z ##[group]Run actions/checkout@v4
+2026-10-13T05:06:38.5470000Z with: x
+2026-10-13T05:06:38.5475690Z ##[endgroup]
+2026-10-13T05:06:40.8901520Z ##[group]Run /usr/bin/python3 -m unittest discover -s tests
+2026-10-13T05:06:40.8957220Z ##[endgroup]
+2026-10-13T05:06:41.0000000Z \x1b[36;1mFAIL: test_x\x1b[0m
+2026-10-13T05:06:41.1000000Z AssertionError: 1 != 2
+2026-10-13T05:06:41.2000000Z ##[error]Process completed with exit code 1.
+2026-10-13T05:07:45.5732890Z Cleaning up orphan processes
+2026-10-13T05:07:45.7716510Z ##[warning]Node.js 20 is deprecated.
+"""
+
+
+class LogExcerptTest(unittest.TestCase):
+    def test_failed_step_only(self):
+        self.assertEqual(ci_release.failed_step_excerpt(LOG).splitlines(), [
+            "Run /usr/bin/python3 -m unittest discover -s tests", "FAIL: test_x", "AssertionError: 1 != 2",
+            "Process completed with exit code 1."])
+
+    def test_long_step_keeps_tail(self):
+        log = "##[group]Run t\n" + "\n".join("l%d" % i for i in range(100)) + "\n##[error]boom\n"
+        out = ci_release.failed_step_excerpt(log, max_lines=5).splitlines()
+        self.assertEqual(out, ["l95", "l96", "l97", "l98", "l99", "boom"])
+
+    def test_no_error_marker_falls_back_to_tail(self):
+        out = ci_release.failed_step_excerpt("a\nb\nc\n", max_lines=2)
+        self.assertEqual(out, "b\nc")
+
+    def test_cli(self):
+        out = subprocess.run([sys.executable, TOOL, "log-excerpt"], input=LOG.encode("utf-8"), check=True,
+                             stdout=subprocess.PIPE).stdout.decode("utf-8")
+        self.assertIn("AssertionError: 1 != 2", out)
+        self.assertNotIn("orphan", out)
+
+
 class NotionPayloadTest(unittest.TestCase):
     HOSTILE = 'fix: "quoted" $(touch /tmp/x) `id` \\ back\nsecond line\t탭'
 

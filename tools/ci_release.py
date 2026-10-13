@@ -5,12 +5,14 @@ notes TAG            Check that TAG (vX.Y.Z) matches pwikilib VERSION and print 
                      (heading line removed), the same shape as the hand-made v0.2.0 release.
 notion-payload       Print the Notion POST /v1/pages body for a failed run. Inputs come from the environment so no value
                      is ever pasted into shell or JSON text: NOTION_DATABASE_ID, REPO, REF, RUN_URL, ACTOR, COMMIT_MSG,
-                     and optionally SUMMARY_FILE (failed jobs/steps and log tail, collected by the workflow).
+                     and optionally SUMMARY_FILE (failed jobs/steps and log excerpts, collected by the workflow).
+log-excerpt          Read a job log on stdin and print the lines of the step(s) that failed.
 
 Exit codes: 0 ok, 1 check failed, 2 usage error.
 """
 import json
 import os
+import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -44,6 +46,23 @@ def release_notes(tag, init_text, changelog_text):
     if not body or not body.strip():
         return None, "CHANGELOG.md 에 [%s] 절이 없거나 비어 있다" % m.group(1)
     return body, None
+
+
+def failed_step_excerpt(log, max_lines=60):
+    """From a job log, the lines of each step that ended in ##[error] (from its '##[group]Run' line), timestamps removed.
+    Falls back to the last max_lines lines when no error marker is found."""
+    lines = [re.sub(r"\x1b\[[0-9;]*m", "", re.sub(r"^\d{4}-\d\d-\d\dT[\d:.]+Z ", "", ln))
+             for ln in (log or "").splitlines()]
+    out, step = [], []
+    for ln in lines:
+        if ln.startswith("##[group]Run "):
+            step = [ln[len("##[group]"):]]
+        elif ln.startswith("##[error]"):
+            out.extend(step[-max_lines:] + [ln[len("##[error]"):]])
+            step = []
+        elif not ln.startswith(("##[group]", "##[endgroup]")):
+            step.append(ln)
+    return "\n".join(out if out else lines[-max_lines:])
 
 
 def _chunks(s, limit=TEXT_LIMIT):
@@ -97,6 +116,9 @@ def main(argv):
             print(err, file=sys.stderr)
             return 1
         sys.stdout.write(notes)
+        return 0
+    if len(argv) == 1 and argv[0] == "log-excerpt":
+        sys.stdout.write(failed_step_excerpt(sys.stdin.read()) + "\n")
         return 0
     if len(argv) == 1 and argv[0] == "notion-payload":
         summary = ""
