@@ -8,7 +8,7 @@ contexts during collection).
     separately). Letter-only fragments (account names) are not replaced.
   - Value hashes: when the first 6+ hex chars of sha256, sha1 or md5 (of value, value+newline) appear as a standalone token, they are replaced.
 Stage 2 (shapes): regexes (DSN user:pass@, mysql -p, sshpass -p, curl -u, PASSWORD=, *_PW=, *PASS= family, IDENTIFIED BY, Bearer,
-  sk-ant-, gh*_, AKIA, xox*-, AIza, apikey_<hex>, PRIVATE KEY, JWT, mobile phone, email). Private IPs are not redacted
+  sk-ant-, gh*_, AKIA, xox*-, AIza, ntn_/secret_ (Notion), apikey_<hex>, PRIVATE KEY, JWT, mobile phone, email). Private IPs are not redacted
   (working knowledge). The leading boundary also treats the position right after \\n, \\t, \\r of re-serialized JSON as a boundary.
 
 Harvest: collects values caught by stage-2 rules that have a value group (password and token contexts). Strong values go into the
@@ -95,6 +95,11 @@ PATTERNS = [
     ("slack_token", r"xox[abposr]-" + _after("xox..", "A-Za-z0-9") + r"[A-Za-z0-9-]{10,200}", ["xox"], "all", False),
     ("google_key", r"AIza" + _after("AIza", "A-Za-z0-9_-") + r"[0-9A-Za-z_-]{35}(?![0-9A-Za-z_-])", ["AIza"], "all",
      False),
+    # 노션 통합 토큰: ntn_<영숫자 40~64>(2024년 9월 이후), secret_<영숫자 43>(그 전). secret_ 은 흔한 식별자 앞머리라
+    # 길이를 43자로 못박고 숫자가 하나 이상 섞인 경우만 본다(secret_access_key 같은 이름은 _ 가 끼어 걸리지 않는다).
+    ("notion_token", r"(?:ntn_" + _after("ntn_", "A-Za-z0-9_") + r"[A-Za-z0-9]{40,64}|secret_"
+     + _after("secret_", "A-Za-z0-9_") + r"(?=[A-Za-z]{0,42}[0-9])[A-Za-z0-9]{43})(?![A-Za-z0-9_])",
+     ["ntn_", "secret_"], "all", False),
     # 뒤 토막은 영숫자를 끝까지 먹는다(16진이 아닌 글자가 붙으면 되짚기로 앞 토막만 가리던 결함).
     ("apikey_hex", r"apikey_" + _after("apikey_", "A-Za-z0-9") + r"[0-9a-fA-F]{8,128}(?:_[0-9A-Za-z]{8,128})*"
      r"(?![0-9A-Za-z])", ["apikey_"], "all", False),

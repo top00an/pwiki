@@ -31,6 +31,7 @@ Harvested values live in `~/.pwiki/secrets.harvested` (mode 600) and nowhere els
 | `aws_key` | `AKIA...`, `ASIA...` access key IDs |
 | `slack_token` | `xoxb-`, `xoxp-` and similar |
 | `google_key` | `AIza...` |
+| `notion_token` | Notion integration tokens (`ntn_...`, older `secret_...`) |
 | `apikey_hex` | `apikey_<hex>` style keys |
 | `bearer` | `Authorization: Bearer <token>` |
 | `dsn` | `scheme://user:password@host` connection strings |

@@ -51,6 +51,7 @@ class TestRedactUnit(unittest.TestCase):
             "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
             "phone": "담당 010-1234-5678 연락",
             "email": "메일 someone.name@example.co.kr 로",
+            "notion_token": "NOTION_API_KEY 는 " + "ntn_" + "4f9Kq2" * 8 + " 이다",
         }
         for kind, s in cases.items():
             r = self.R.text(s)
@@ -58,9 +59,18 @@ class TestRedactUnit(unittest.TestCase):
             self.assertEqual(self.left(r), {}, kind)
             self.assertEqual(self.R.text(r), r, "idempotent " + kind)
 
+    def test_notion_token_shapes(self):
+        for tok in ("ntn_" + "55599498" + "Ab3dEfGh" * 5 + "u8y5",  # 현재 형식(ntn_ 뒤 46자)
+                    "secret_" + "Xy7" * 14 + "Q"):  # 예전 형식(secret_ 뒤 43자)
+            for s in ("key=" + tok, '"Authorization: Bearer x"\\n' + tok, tok + "."):
+                r = self.R.text(s)
+                self.assertIn("[REDACTED:notion_token]", r, s)
+                self.assertNotIn(tok[8:20], r, s)
+
     def test_keep_work_knowledge(self):
         keep = ["서버 10.0.0.2 과 10.0.0.1", "ssh -p 22 root@ssh5.example.net", "uuid 01012345-6789-4abc-8def-0123456789ab",
-                "cost 0.01012345678", "PGPASSWORD=$PGPASS psql", "pwd: /Users/x", "password=True"]
+                "cost 0.01012345678", "PGPASSWORD=$PGPASS psql", "pwd: /Users/x", "password=True",
+                "secret_access_key_id_and_more_words_here_ok", "secret_" + "a" * 43, "ntn_short1234"]
         for s in keep:
             self.assertEqual(self.R.text(s), s, s)
 

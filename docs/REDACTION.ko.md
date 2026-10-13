@@ -31,6 +31,7 @@ pwiki 는 **비밀값을 최대한 찾아 마스킹하지만, 모두 마스킹�
 | `aws_key` | `AKIA...`, `ASIA...` 액세스 키 ID |
 | `slack_token` | `xoxb-`, `xoxp-` 등 |
 | `google_key` | `AIza...` |
+| `notion_token` | 노션 통합 토큰(`ntn_...`, 예전 형식 `secret_...`) |
 | `apikey_hex` | `apikey_<16진>` 형태 키 |
 | `bearer` | `Authorization: Bearer <토큰>` |
 | `dsn` | `scheme://user:password@host` 접속 문자열 |

@@ -38,6 +38,7 @@ TOKEN_RX = [
     ("aws_key", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
     ("slack_token", re.compile(r"\bxox[abposr]-[A-Za-z0-9-]{10,}")),
     ("google_key", re.compile(r"\bAIza[0-9A-Za-z_-]{30,}")),
+    ("notion_token", re.compile(r"\b(?:ntn_[A-Za-z0-9]{40,}|secret_(?=[A-Za-z]{0,42}[0-9])[A-Za-z0-9]{43}\b)")),
     ("jwt", re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.(eyJ[A-Za-z0-9_-]{8,})\.[A-Za-z0-9_-]{8,}")),
     ("private_key", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----([\s\S]{0,8000}?)-----END [A-Z ]*PRIVATE KEY-----")),
 ]
